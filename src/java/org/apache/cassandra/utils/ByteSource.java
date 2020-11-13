@@ -69,7 +69,20 @@ public interface ByteSource
      */
     static ByteSource of(ByteBuffer buf, Version version)
     {
-        return new BufferReinterpreter(buf, version);
+        if (buf.isDirect())
+            return of(UnsafeByteBufferAccess.getAddress(buf) + buf.position(), buf.remaining(), version);
+        else
+            return new BufferReinterpreter(buf, version);
+    }
+
+    /**
+     * Reinterprets a memory range as a byte-comparable source that has 0s escaped and finishes in an escape.
+     * This provides a weakly-prefix-free byte-comparable version of the content to use in sequences.
+     * (See ByteSource.BufferReinterpreter/Multi for explanation.)
+     */
+    static ByteSource of(long address, int length, Version version)
+    {
+        return new UnsafeReinterpreter(address, length, version);
     }
 
     /**
@@ -347,6 +360,29 @@ public interface ByteSource
         protected byte get(int index)
         {
             return buf.get(index);
+        }
+    }
+
+    static class UnsafeReinterpreter extends AbstractReinterpreter
+    {
+        final long address;
+        final int length;
+
+        private UnsafeReinterpreter(long address, int length, Version version)
+        {
+            super(0, version);
+            this.address = address;
+            this.length = length;
+        }
+
+        protected byte get(int index)
+        {
+            return UnsafeMemoryAccess.getByte(address + index);
+        }
+
+        protected int limit()
+        {
+            return length;
         }
     }
 
