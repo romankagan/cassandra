@@ -32,13 +32,14 @@ import org.apache.cassandra.db.commitlog.IntervalSet;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.partitions.PartitionStatisticsCollector;
 import org.apache.cassandra.db.rows.Cell;
+import org.apache.cassandra.db.rows.Unfiltered;
 import org.apache.cassandra.io.sstable.SSTable;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.utils.EstimatedHistogram;
 import org.apache.cassandra.utils.MurmurHash;
-import org.apache.cassandra.utils.streamhist.TombstoneHistogram;
 import org.apache.cassandra.utils.streamhist.StreamingTombstoneHistogramBuilder;
+import org.apache.cassandra.utils.streamhist.TombstoneHistogram;
 
 public class MetadataCollector implements PartitionStatisticsCollector
 {
@@ -97,8 +98,22 @@ public class MetadataCollector implements PartitionStatisticsCollector
     protected double compressionRatio = NO_COMPRESSION_RATIO;
     protected StreamingTombstoneHistogramBuilder estimatedTombstoneDropTime = new StreamingTombstoneHistogramBuilder(SSTable.TOMBSTONE_HISTOGRAM_BIN_SIZE, SSTable.TOMBSTONE_HISTOGRAM_SPOOL_SIZE, SSTable.TOMBSTONE_HISTOGRAM_TTL_ROUND_SECONDS);
     protected int sstableLevel;
-    private ClusteringPrefix<?> minClustering = null;
-    private ClusteringPrefix<?> maxClustering = null;
+
+    /**
+     * The smallest clustering prefix for any {@link Unfiltered} in the sstable.
+     *
+     * <p>This is always either a Clustering, or a start bound (since for any end range tombstone bound, there should
+     * be a corresponding start bound that is smaller).
+     */
+    private ClusteringPrefix<?> minClustering = ClusteringBound.MAX_START;
+    /**
+     * The largest clustering prefix for any {@link Unfiltered} in the sstable.
+     *
+     * <p>This is always either a Clustering, or an end bound (since for any start range tombstone bound, there should
+     * be a corresponding end bound that is bigger).
+     */
+    private ClusteringPrefix<?> maxClustering = ClusteringBound.MIN_END;
+
     protected boolean hasLegacyCounterShards = false;
     private boolean hasPartitionLevelDeletions = false;
     protected long totalColumnsSet;
@@ -234,10 +249,48 @@ public class MetadataCollector implements PartitionStatisticsCollector
         return this;
     }
 
-    public MetadataCollector updateClusteringValues(ClusteringPrefix<?> clustering)
+    public MetadataCollector updateClusteringValues(Clustering<?> clustering)
     {
-        minClustering = minClustering == null || comparator.compare(clustering, minClustering) < 0 ? clustering.minimize() : minClustering;
-        maxClustering = maxClustering == null || comparator.compare(clustering, maxClustering) > 0 ? clustering.minimize() : maxClustering;
+        if (clustering == Clustering.STATIC_CLUSTERING)
+            return this;
+
+        if (minClustering == ClusteringBound.MAX_START || maxClustering == ClusteringBound.MIN_END)
+        {
+            // the only case when we update both the min and max clustering is the first value processed by the collector
+            // in such a case, min and max clustering = clustering
+            minClustering = clustering.minimize();
+            maxClustering = minClustering;
+        }
+        else if (comparator.compare(clustering, minClustering) < 0)
+        {
+            minClustering = clustering.minimize();
+        }
+        else if (comparator.compare(clustering, maxClustering) > 0)
+        {
+            maxClustering = clustering.minimize();
+        }
+        return this;
+    }
+
+    public MetadataCollector updateClusteringValues(ClusteringBoundOrBoundary<?> clusteringBoundOrBoundary)
+    {
+        // In a SSTable, every opening marker will be closed, so the start of a range tombstone marker will never be
+        // be the maxClustering (the corresponding close might though) and there is no point in doing the comparison
+        // (and vice-versa for the close). By the same reasoning, a boundary will never be either the min or max
+        // clustering and we can save comparisons.
+        if (clusteringBoundOrBoundary.isBoundary())
+            return this;
+
+        if (clusteringBoundOrBoundary.kind().isStart())
+        {
+            if (comparator.compare(clusteringBoundOrBoundary, minClustering) < 0)
+                minClustering = clusteringBoundOrBoundary.minimize();
+        }
+        else
+        {
+            if (comparator.compare(clusteringBoundOrBoundary, maxClustering) > 0)
+                maxClustering = clusteringBoundOrBoundary.minimize();
+        }
         return this;
     }
 
