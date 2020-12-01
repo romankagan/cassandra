@@ -313,6 +313,10 @@ public interface ClusteringPrefix<V> extends IMeasurableMemory, Clusterable<V>
      */
     public String toString(TableMetadata metadata);
 
+    public ClusteringBound<V> asStartBound();
+
+    public ClusteringBound<V> asEndBound();
+
     /*
      * TODO: we should stop using Clustering for partition keys. Maybe we can add
      * a few methods to DecoratedKey so we don't have to (note that while using a Clustering

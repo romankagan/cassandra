@@ -102,12 +102,12 @@ public interface ClusteringBound<V> extends ClusteringBoundOrBoundary<V>
         return from.accessor().factory().bound(kind, from.getRawValues());
     }
 
-    public static ClusteringBound<?> inclusiveStartOf(ClusteringPrefix<?> from)
+    public static <V> ClusteringBound<V> inclusiveStartOf(ClusteringPrefix<V> from)
     {
         return create(ClusteringPrefix.Kind.INCL_START_BOUND, from);
     }
 
-    public static ClusteringBound<?> inclusiveEndOf(ClusteringPrefix<?> from)
+    public static <V> ClusteringBound<V> inclusiveEndOf(ClusteringPrefix<V> from)
     {
         return create(ClusteringPrefix.Kind.INCL_END_BOUND, from);
     }
@@ -133,5 +133,17 @@ public interface ClusteringBound<V> extends ClusteringBoundOrBoundary<V>
                 builder.add(val);
         }
         return builder.buildBound(isStart, isInclusive);
+    }
+
+    @Override
+    default ClusteringBound<V> asStartBound()
+    {
+        return this;
+    }
+
+    @Override
+    default ClusteringBound<V> asEndBound()
+    {
+        return this;
     }
 }

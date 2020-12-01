@@ -23,7 +23,6 @@ package org.apache.cassandra.db.rows;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Comparator;
-import java.util.List;
 
 import org.apache.cassandra.db.marshal.ByteBufferAccessor;
 import org.apache.cassandra.io.sstable.format.big.BigTableRowIndexEntry;
@@ -252,12 +251,12 @@ public class UnfilteredRowIteratorWithLowerBound extends LazilyInitializedUnfilt
             return null;
 
         final StatsMetadata m = sstable.getSSTableMetadata();
-        List<ByteBuffer> vals = filter.isReversed() ? m.maxClusteringValues : m.minClusteringValues;
-        assert vals.size() <= metadata().comparator.size() :
+        ByteBuffer[] vals = (filter.isReversed() ? m.coveredClustering.end() : m.coveredClustering.start()).getBufferArray();
+        assert vals.length <= metadata().comparator.size() :
         String.format("Unexpected number of clustering values %d, expected %d or fewer for %s",
-                      vals.size(),
+                      vals.length,
                       metadata().comparator.size(),
                       sstable.getFilename());
-        return ByteBufferAccessor.instance.factory().inclusiveOpen(filter.isReversed(), vals.toArray(new ByteBuffer[vals.size()]));
+        return ByteBufferAccessor.instance.factory().inclusiveOpen(filter.isReversed(), vals);
     }
 }

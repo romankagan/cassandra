@@ -18,16 +18,11 @@
 package org.apache.cassandra.io.sstable.metadata;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.clearspring.analytics.stream.cardinality.ICardinality;
@@ -40,7 +35,6 @@ import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.io.sstable.SSTable;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.service.ActiveRepairService;
-import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.EstimatedHistogram;
 import org.apache.cassandra.utils.MurmurHash;
 import org.apache.cassandra.utils.streamhist.TombstoneHistogram;
@@ -82,8 +76,9 @@ public class MetadataCollector implements PartitionStatisticsCollector
                                  NO_COMPRESSION_RATIO,
                                  defaultTombstoneDropTimeHistogram(),
                                  0,
-                                 Collections.<ByteBuffer>emptyList(),
-                                 Collections.<ByteBuffer>emptyList(),
+                                 null,
+                                 Slice.ALL,
+                                 true,
                                  true,
                                  ActiveRepairService.UNREPAIRED_SSTABLE,
                                  -1,
@@ -105,9 +100,11 @@ public class MetadataCollector implements PartitionStatisticsCollector
     private ClusteringPrefix<?> minClustering = null;
     private ClusteringPrefix<?> maxClustering = null;
     protected boolean hasLegacyCounterShards = false;
+    private boolean hasPartitionLevelDeletions = false;
     protected long totalColumnsSet;
     protected long totalRows;
 
+    private final AbstractType<?>[] comparators;
     /**
      * Default cardinality estimation method is to use HyperLogLog++.
      * Parameter here(p=13, sp=25) should give reasonable estimation
@@ -121,6 +118,10 @@ public class MetadataCollector implements PartitionStatisticsCollector
     {
         this.comparator = comparator;
 
+        int clusteringTypesNum = comparator.size();
+        this.comparators = new AbstractType[clusteringTypesNum];
+        for (int i = 0; i < clusteringTypesNum; i++)
+            comparators[i] = comparator.subtype(i);
     }
 
     public MetadataCollector(Iterable<SSTableReader> sstables, ClusteringComparator comparator, int level)
@@ -183,6 +184,12 @@ public class MetadataCollector implements PartitionStatisticsCollector
         updateLocalDeletionTime(cell.localDeletionTime());
     }
 
+    public void updatePartitionDeletion(DeletionTime dt)
+    {
+        if (!dt.isLive())
+            hasPartitionLevelDeletions = true;
+        update(dt);
+    }
     public void update(DeletionTime dt)
     {
         if (!dt.isLive())
@@ -259,9 +266,10 @@ public class MetadataCollector implements PartitionStatisticsCollector
                                                              compressionRatio,
                                                              estimatedTombstoneDropTime.build(),
                                                              sstableLevel,
-                                                             makeList(minValues),
-                                                             makeList(maxValues),
+                                                             comparator.subtypes(),
+                                                             Slice.make(minClustering, maxClustering),
                                                              hasLegacyCounterShards,
+                                                             hasPartitionLevelDeletions,
                                                              repairedAt,
                                                              totalColumnsSet,
                                                              totalRows,
@@ -278,18 +286,6 @@ public class MetadataCollector implements PartitionStatisticsCollector
     public void release()
     {
         estimatedTombstoneDropTime.releaseBuffers();
-    }
-
-    private static List<ByteBuffer> makeList(ByteBuffer[] values)
-    {
-        // In most case, l will be the same size than values, but it's possible for it to be smaller
-        List<ByteBuffer> l = new ArrayList<ByteBuffer>(values.length);
-        for (int i = 0; i < values.length; i++)
-            if (values[i] == null)
-                break;
-            else
-                l.add(values[i]);
-        return l;
     }
 
     public static class MinMaxLongTracker
