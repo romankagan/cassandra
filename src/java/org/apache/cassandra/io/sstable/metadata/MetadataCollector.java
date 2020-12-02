@@ -113,6 +113,7 @@ public class MetadataCollector implements PartitionStatisticsCollector
      * be a corresponding end bound that is bigger).
      */
     private ClusteringPrefix<?> maxClustering = ClusteringBound.MIN_END;
+    private boolean clusteringInitialized = false;
 
     protected boolean hasLegacyCounterShards = false;
     private boolean hasPartitionLevelDeletions = false;
@@ -254,25 +255,27 @@ public class MetadataCollector implements PartitionStatisticsCollector
         if (clustering == Clustering.STATIC_CLUSTERING)
             return this;
 
-        if (minClustering == ClusteringBound.MAX_START || maxClustering == ClusteringBound.MIN_END)
+        if (!clusteringInitialized)
         {
-            // the only case when we update both the min and max clustering is the first value processed by the collector
-            // in such a case, min and max clustering = clustering
+            clusteringInitialized = true;
             minClustering = clustering.minimize();
             maxClustering = minClustering;
+            return this;
         }
-        else if (comparator.compare(clustering, minClustering) < 0)
-        {
-            minClustering = clustering.minimize();
-        }
-        else if (comparator.compare(clustering, maxClustering) > 0)
+
+        if (comparator.compare((ClusteringPrefix<?>) clustering, (ClusteringPrefix<?>) maxClustering) > 0)
         {
             maxClustering = clustering.minimize();
+            return this;
         }
+
+        if (comparator.compare((ClusteringPrefix<?>) clustering, (ClusteringPrefix<?>) minClustering) < 0)
+            minClustering = clustering.minimize();
+
         return this;
     }
 
-    public MetadataCollector updateClusteringValues(ClusteringBoundOrBoundary<?> clusteringBoundOrBoundary)
+    public MetadataCollector updateClusteringValuesByBoundOrBoundary(ClusteringBoundOrBoundary<?> clusteringBoundOrBoundary)
     {
         // In a SSTable, every opening marker will be closed, so the start of a range tombstone marker will never be
         // be the maxClustering (the corresponding close might though) and there is no point in doing the comparison
@@ -301,10 +304,6 @@ public class MetadataCollector implements PartitionStatisticsCollector
 
     public Map<MetadataType, MetadataComponent> finalizeMetadata(String partitioner, double bloomFilterFPChance, long repairedAt, UUID pendingRepair, boolean isTransient, SerializationHeader header)
     {
-        Preconditions.checkState((minClustering == null && maxClustering == null)
-                                 || comparator.compare(maxClustering, minClustering) >= 0);
-        ByteBuffer[] minValues = minClustering != null ? minClustering.getBufferArray() : EMPTY_CLUSTERING;
-        ByteBuffer[] maxValues = maxClustering != null ? maxClustering.getBufferArray() : EMPTY_CLUSTERING;
         Map<MetadataType, MetadataComponent> components = new EnumMap<>(MetadataType.class);
         components.put(MetadataType.VALIDATION, new ValidationMetadata(partitioner, bloomFilterFPChance));
         components.put(MetadataType.STATS, new StatsMetadata(estimatedPartitionSize,

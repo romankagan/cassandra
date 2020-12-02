@@ -124,13 +124,13 @@ public class MetadataCollectorBench
     @Benchmark
     public void updateClusteringBound()
     {
-        collector.updateClusteringValues(nextClusteringBound());
+        collector.updateClusteringValuesByBoundOrBoundary(nextClusteringBound());
     }
 
     @Benchmark
     public void updateClusteringBoundary()
     {
-        collector.updateClusteringValues(nextClusteringBoundary());
+        collector.updateClusteringValuesByBoundOrBoundary(nextClusteringBoundary());
     }
 
     public Cell<?> nextCell()
