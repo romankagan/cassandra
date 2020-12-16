@@ -38,8 +38,9 @@ import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.ByteComparable.Version;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
 
 import static com.google.common.collect.Iterables.any;
 
@@ -254,6 +255,67 @@ public class DynamicCompositeType extends AbstractCompositeType
 
         return ByteSource.withTerminator(version == Version.LEGACY ? ByteSource.END_OF_STREAM : ByteSource.TERMINATOR,
                                          srcs.toArray(EMPTY_BYTE_SOURCE_ARRAY));
+    }
+
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, Version version)
+    {
+        // For ByteComparable.Version.DSE6 the terminator byte is ByteSource.END_OF_STREAM. Just like with
+        // CompositeType, this means that in multi-component sequences the terminator may be transformed to a regular
+        // component separator, but unlike CompositeType (where we have the expected number of types/components),
+        // this can make the end of the whole dynamic composite type indistinguishable from the end of a component
+        // somewhere in the middle of the dynamic composite type. Because of that, DynamicCompositeType elements
+        // cannot always be safely decoded using that encoding version.
+        // Even more so than with CompositeType, we just take advantage of the fact that we don't need to decode from
+        // Version.LEGACY, assume that we never do that, and assert it here.
+        assert version != Version.LEGACY;
+
+        if (comparableBytes == null)
+            return ByteBufferUtil.EMPTY_BYTE_BUFFER;
+
+        int separator = comparableBytes.next();
+        // We don't actually need isStatic, we just consume it in order to be able to continue past it.
+        boolean isStatic = ByteSourceUtil.nextComponentNull(separator);
+
+        List<String> types = new ArrayList<>();
+        List<ByteBuffer> values = new ArrayList<>();
+        byte lastEoc = 0;
+
+        while ((separator = comparableBytes.next()) != ByteSource.TERMINATOR)
+        {
+            // Solely the end-of-component byte of the last component of this composite can be non-zero.
+            assert lastEoc == 0 : lastEoc;
+
+            boolean isReversed = false;
+            // Decode the next type's simple class name that is encoded before its fully qualified class name (in order
+            // for comparisons to work correctly).
+            String simpleClassName = ByteSourceUtil.getString(ByteSourceUtil.nextComponentSource(comparableBytes, separator));
+            if (REVERSED_TYPE.equals(simpleClassName))
+            {
+                // Special-handle if the type is reversed (and decode the actual base type simple class name).
+                isReversed = true;
+                simpleClassName = ByteSourceUtil.getString(ByteSourceUtil.nextComponentSource(comparableBytes));
+            }
+
+            // Decode the type's fully qualified class name and parse the actual type from it.
+            String fullClassName = ByteSourceUtil.getString(ByteSourceUtil.nextComponentSource(comparableBytes));
+            assert fullClassName.endsWith(simpleClassName);
+            AbstractType<?> type = isReversed ? ReversedType.getInstance(TypeParser.parse(fullClassName))
+                                              : TypeParser.parse(fullClassName);
+            assert type != null;
+            types.add(fullClassName);
+
+            // Decode the payload from this type.
+            ByteBuffer value = type.fromComparableBytes(ByteSourceUtil.nextComponentSource(comparableBytes), version);
+            values.add(value);
+
+            // Also decode the corresponding end-of-component byte - the last one we decode will be taken into
+            // account when we deserialize the decoded data into an object.
+            lastEoc = ByteSourceUtil.getByte(ByteSourceUtil.nextComponentSource(comparableBytes));
+        }
+        ByteBuffer result = build(types, values, lastEoc);
+        result.rewind();
+        return result;
     }
 
     public static ByteBuffer build(List<String> types, List<ByteBuffer> values)

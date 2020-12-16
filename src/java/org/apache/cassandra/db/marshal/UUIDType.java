@@ -30,8 +30,9 @@ import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.serializers.UUIDSerializer;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.ByteComparable;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
 import org.apache.cassandra.utils.UUIDGen;
 
 /**
@@ -98,6 +99,11 @@ public class UUIDType extends AbstractType<UUID>
                 return c;
         }
 
+        // Amusingly (or not so much), although UUIDType freely takes time UUIDs (UUIDs with version 1), it compares
+        // them differently than TimeUUIDType. This is evident in the least significant bytes comparison (the code
+        // below for UUIDType), where UUIDType flips only the leading bit of the leading byte, where TimeUUIDType flips
+        // the leading bits of all the other bytes (the so-called native machine order). See CASSANDRA-8730 for details
+        // around this discrepancy.
         return UnsignedLongs.compare(accessorL.getLong(left, 8), accessorR.getLong(right, 8));
     }
 
@@ -121,6 +127,12 @@ public class UUIDType extends AbstractType<UUID>
 
         // fixed-length thus prefix-free
         return ByteSource.fixedLength(swizzled);
+    }
+
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    {
+        return ByteSourceUtil.getUuidBytes(comparableBytes, UUIDType.instance);
     }
 
     @Override

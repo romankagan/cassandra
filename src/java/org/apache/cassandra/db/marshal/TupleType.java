@@ -35,8 +35,9 @@ import org.apache.cassandra.exceptions.SyntaxException;
 import org.apache.cassandra.serializers.*;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.ByteComparable;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
 
 import static com.google.common.collect.Iterables.any;
 import static com.google.common.collect.Iterables.transform;
@@ -215,6 +216,19 @@ public class TupleType extends AbstractType<ByteBuffer>
         return ByteSource.withTerminator(ByteSource.END_OF_STREAM, srcs);
     }
 
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    {
+        ByteBuffer[] componentBuffers = new ByteBuffer[types.size()];
+        for (int i = 0; i < types.size(); ++i)
+        {
+            AbstractType<?> componentType = types.get(i);
+            ByteSource.Peekable component = ByteSourceUtil.nextComponentSource(comparableBytes);
+            componentBuffers[i] = componentType.fromComparableBytes(component, version);
+        }
+        return buildValue(componentBuffers);
+    }
+
     /**
      * Split a tuple value into its component values.
      */
@@ -247,7 +261,8 @@ public class TupleType extends AbstractType<ByteBuffer>
         return components;
     }
 
-    public static <V> V buildValue(ValueAccessor<V> accessor, V[] components)
+    @SafeVarargs
+    public static <V> V buildValue(ValueAccessor<V> accessor, V... components)
     {
         int totalLength = 0;
         for (V component : components)
@@ -271,7 +286,7 @@ public class TupleType extends AbstractType<ByteBuffer>
         return result;
     }
 
-    public static ByteBuffer buildValue(ByteBuffer[] components)
+    public static ByteBuffer buildValue(ByteBuffer... components)
     {
         return buildValue(ByteBufferAccessor.instance, components);
     }

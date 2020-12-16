@@ -33,8 +33,8 @@ import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.ByteComparable;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
 import org.apache.cassandra.utils.NoSpamLogger;
 
 /**
@@ -72,6 +72,12 @@ public class EmptyType extends AbstractType<Void>
 
     @Override
     public ByteSource asComparableBytes(ByteBuffer b, ByteComparable.Version version)
+    {
+        return null;
+    }
+
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
         return null;
     }

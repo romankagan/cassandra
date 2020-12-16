@@ -30,8 +30,8 @@ import org.apache.cassandra.serializers.IntegerSerializer;
 import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.ByteComparable;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
 
 public final class IntegerType extends NumberType<BigInteger>
 {
@@ -42,6 +42,8 @@ public final class IntegerType extends NumberType<BigInteger>
     private static final int POSITIVE_VARINT_HEADER = 0x80;
     private static final int NEGATIVE_VARINT_LENGTH_HEADER = 0x00;
     private static final int POSITIVE_VARINT_LENGTH_HEADER = 0xFF;
+    private static final byte BIG_INTEGER_NEGATIVE_LEADING_ZERO = (byte) 0xFF;
+    private static final byte BIG_INTEGER_POSITIVE_LEADING_ZERO = (byte) 0x00;
 
     private static <V> int findMostSignificantByte(V value, ValueAccessor<V> accessor)
     {
@@ -202,6 +204,49 @@ public final class IntegerType extends NumberType<BigInteger>
                 return buf.get(pos++) & 0xFF;
             }
         };
+    }
+
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    {
+        if (comparableBytes == null)
+            return ByteBufferUtil.EMPTY_BYTE_BUFFER;
+
+        // Consume the first byte to determine whether the encoded number is positive.
+        int curr = comparableBytes.next();
+        boolean isPositive = curr >= POSITIVE_VARINT_HEADER;
+        // Start iterating through the length header bytes and counting the number of value bytes.
+        int valueBytes = isPositive ? curr - POSITIVE_VARINT_HEADER + 1 : POSITIVE_VARINT_HEADER - curr;
+        while ((isPositive && curr == POSITIVE_VARINT_LENGTH_HEADER)
+                || (!isPositive && curr == NEGATIVE_VARINT_LENGTH_HEADER))
+        {
+            curr = comparableBytes.next();
+            valueBytes += isPositive ? curr - POSITIVE_VARINT_HEADER + 1 : POSITIVE_VARINT_HEADER - curr;
+        }
+
+        // Add "leading zero" if needed (i.e. in case the leading byte of a positive number corresponds to a negative
+        // value, or in case the leading byte of a negative number corresponds to a non-negative value).
+        // Size the array containing all the value bytes accordingly.
+        curr = comparableBytes.next();
+        byte[] buf;
+        int writtenBytes = 0;
+        if ((isPositive && curr >= POSITIVE_VARINT_HEADER)
+                || (!isPositive && curr < POSITIVE_VARINT_HEADER))
+        {
+            buf = new byte[valueBytes + 1];
+            buf[writtenBytes++] = isPositive ? BIG_INTEGER_POSITIVE_LEADING_ZERO : BIG_INTEGER_NEGATIVE_LEADING_ZERO;
+        }
+        else
+            buf = new byte[valueBytes];
+        // Don't forget to add the first consumed value byte after determining whether leading zero should be added
+        // and sizing the value bytes array.
+        buf[writtenBytes++] = (byte) curr;
+
+        // Consume exactly the number of expected value bytes.
+        while (writtenBytes < buf.length)
+            buf[writtenBytes++] = (byte) comparableBytes.next();
+
+        return ByteBuffer.wrap(buf);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

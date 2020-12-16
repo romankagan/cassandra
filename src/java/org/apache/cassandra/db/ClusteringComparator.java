@@ -18,6 +18,7 @@
 package org.apache.cassandra.db;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -31,8 +32,14 @@ import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.serializers.MarshalException;
 
 import org.apache.cassandra.io.sstable.format.big.IndexInfo;
-import org.apache.cassandra.utils.ByteComparable;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
+
+import static org.apache.cassandra.utils.bytecomparable.ByteSource.EXCLUDED;
+import static org.apache.cassandra.utils.bytecomparable.ByteSource.NEXT_COMPONENT;
+import static org.apache.cassandra.utils.bytecomparable.ByteSource.NEXT_COMPONENT_NULL;
+import static org.apache.cassandra.utils.bytecomparable.ByteSource.NEXT_COMPONENT_NULL_REVERSED;
+import static org.apache.cassandra.utils.bytecomparable.ByteSource.TERMINATOR;
 
 /**
  * A comparator of clustering prefixes (or more generally of {@link Clusterable}}.
@@ -314,6 +321,125 @@ public class ClusteringComparator implements Comparator<Clusterable>
         public String toString()
         {
             return src.clusteringString(subtypes());
+        }
+    }
+
+    public Clustering<ByteBuffer> clusteringFromOrderedBytes(ByteSource.Peekable orderedBytes, ByteComparable.Version version)
+    {
+        assert version == ByteComparable.Version.LEGACY;
+        if (orderedBytes == null)
+            return null;
+
+        // First check for special cases (partition key only, static clustering) that can do without buffers.
+        int sep = orderedBytes.next();
+        switch (sep)
+        {
+        case TERMINATOR:
+            assert size() == 0 : "Terminator should be after " + size() + " components, got 0";
+            return Clustering.EMPTY;
+        case EXCLUDED:
+            return Clustering.STATIC_CLUSTERING;
+        // else continue with processing
+        }
+
+        int cc = 0;
+        ByteBuffer[] components = new ByteBuffer[size()];
+
+        while (true)
+        {
+            switch (sep)
+            {
+            case NEXT_COMPONENT_NULL:
+            case NEXT_COMPONENT_NULL_REVERSED:
+                components[cc] = null;
+                break;
+            case NEXT_COMPONENT:
+                components[cc] = subtype(cc).fromComparableBytes(orderedBytes, version);
+                break;
+            case TERMINATOR:
+                assert cc == size() : "Terminator should be after " + size() + " components, got " + cc;
+                return new BufferClustering(components);
+            case EXCLUDED:
+                throw new AssertionError("Unexpected static terminator after the first component");
+            default:
+                throw new AssertionError("Unexpected separator " + Integer.toHexString(sep) + " in Clustering encoding");
+            }
+            ++cc;
+            sep = orderedBytes.next();
+        }
+    }
+
+    public ClusteringBound<ByteBuffer> boundFromOrderedBytes(ByteSource.Peekable orderedBytes, ByteComparable.Version version, boolean isEnd)
+    {
+        assert version == ByteComparable.Version.LEGACY;
+        if (orderedBytes == null)
+            return null;
+
+        // First check for special cases (partition key only, static clustering) that can do without buffers.
+        int sep = orderedBytes.next();
+        int cc = 0;
+        ByteBuffer[] components = new ByteBuffer[size()];
+
+        while (true)
+        {
+            switch (sep)
+            {
+            case NEXT_COMPONENT_NULL:
+            case NEXT_COMPONENT_NULL_REVERSED:
+                components[cc] = null;
+                break;
+            case NEXT_COMPONENT:
+                components[cc] = subtype(cc).fromComparableBytes(orderedBytes, version);
+                break;
+            case ByteSource.LT_NEXT_COMPONENT:
+                return isEnd ?
+                       BufferClusteringBound.exclusiveEndOf(Arrays.copyOf(components, cc)) :
+                       BufferClusteringBound.inclusiveStartOf(Arrays.copyOf(components, cc));
+            case ByteSource.GT_NEXT_COMPONENT:
+                return isEnd ?
+                       BufferClusteringBound.inclusiveEndOf(Arrays.copyOf(components, cc)) :
+                       BufferClusteringBound.exclusiveStartOf(Arrays.copyOf(components, cc));
+            default:
+                throw new AssertionError("Unexpected separator " + Integer.toHexString(sep) + " in ClusteringBound encoding");
+            }
+            ++cc;
+            sep = orderedBytes.next();
+        }
+    }
+
+    public ClusteringBoundary<ByteBuffer> boundaryFromOrderedBytes(ByteSource.Peekable orderedBytes, ByteComparable.Version version)
+    {
+        assert version == ByteComparable.Version.LEGACY;
+        if (orderedBytes == null)
+            return null;
+
+        // First check for special cases (partition key only, static clustering) that can do without buffers.
+        int sep = orderedBytes.next();
+        int cc = 0;
+        ByteBuffer[] components = new ByteBuffer[size()];
+
+        while (true)
+        {
+            switch (sep)
+            {
+            case NEXT_COMPONENT_NULL:
+            case NEXT_COMPONENT_NULL_REVERSED:
+                components[cc] = null;
+                break;
+            case NEXT_COMPONENT:
+                components[cc] = subtype(cc).fromComparableBytes(orderedBytes, version);
+                break;
+            case ByteSource.LT_NEXT_COMPONENT:
+                return BufferClusteringBoundary.create(ClusteringPrefix.Kind.EXCL_END_INCL_START_BOUNDARY,
+                                                       Arrays.copyOf(components, cc));
+            case ByteSource.GT_NEXT_COMPONENT:
+                return BufferClusteringBoundary.create(ClusteringPrefix.Kind.INCL_END_EXCL_START_BOUNDARY,
+                                                       Arrays.copyOf(components, cc));
+            default:
+                throw new AssertionError("Unexpected separator " + Integer.toHexString(sep) + " in ClusteringBoundary encoding");
+            }
+            ++cc;
+            sep = orderedBytes.next();
         }
     }
 

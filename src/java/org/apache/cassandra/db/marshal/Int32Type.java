@@ -28,8 +28,9 @@ import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.ByteComparable;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
 
 public class Int32Type extends NumberType<Integer>
 {
@@ -61,6 +62,12 @@ public class Int32Type extends NumberType<Integer>
     public ByteSource asComparableBytes(ByteBuffer buf, ByteComparable.Version version)
     {
         return ByteSource.optionalSignedFixedLengthNumber(buf);
+    }
+
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    {
+        return ByteSourceUtil.getOptionalSignedFixedLength(comparableBytes, 4);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

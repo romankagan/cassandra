@@ -27,8 +27,9 @@ import org.apache.cassandra.serializers.DoubleSerializer;
 import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.ByteComparable;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
 
 public class DoubleType extends NumberType<Double>
 {
@@ -56,6 +57,12 @@ public class DoubleType extends NumberType<Double>
     public ByteSource asComparableBytes(ByteBuffer buf, ByteComparable.Version version)
     {
         return ByteSource.optionalSignedFixedLengthFloat(buf);
+    }
+
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    {
+        return ByteSourceUtil.getOptionalSignedFixedLengthFloat(comparableBytes, 8);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

@@ -27,9 +27,10 @@ import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.ByteComparable;
-import org.apache.cassandra.utils.ByteComparable.Version;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
 
 public class ByteType extends NumberType<Byte>
 {
@@ -48,9 +49,14 @@ public class ByteType extends NumberType<Byte>
     @Override
     public ByteSource asComparableBytes(ByteBuffer buf, Version version)
     {
-        return version == Version.LEGACY
-               ? ByteSource.signedFixedLengthNumber(buf)
-               : ByteSource.optionalSignedFixedLengthNumber(buf);
+        // This type does not allow non-present values, but we do just to avoid future complexity.
+        return ByteSource.optionalSignedFixedLengthNumber(buf);
+    }
+
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    {
+        return ByteSourceUtil.getOptionalSignedFixedLength(comparableBytes, 1);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

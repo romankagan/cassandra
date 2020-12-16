@@ -31,8 +31,9 @@ import org.apache.cassandra.serializers.CollectionSerializer;
 import org.apache.cassandra.serializers.MapSerializer;
 import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.transport.ProtocolVersion;
-import org.apache.cassandra.utils.ByteComparable.Version;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
 import org.apache.cassandra.utils.Pair;
 
 public class MapType<K, V> extends CollectionType<Map<K, V>>
@@ -226,6 +227,12 @@ public class MapType<K, V> extends CollectionType<Map<K, V>>
         return asComparableBytesMap(getKeysType(), getValuesType(), b, version);
     }
 
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, Version version)
+    {
+        return fromComparableBytesMap(comparableBytes, version, getKeysType(), getValuesType());
+    }
+
     static ByteSource asComparableBytesMap(AbstractType<?> keysComparator, AbstractType<?> valuesComparator, ByteBuffer b, Version version)
     {
         if (!b.hasRemaining())
@@ -247,6 +254,30 @@ public class MapType<K, V> extends CollectionType<Map<K, V>>
             srcs[i * 2 + 1] = valuesComparator.asComparableBytes(v, version);
         }
         return ByteSource.withTerminator(version == Version.LEGACY ? 0x00 : ByteSource.TERMINATOR, srcs);
+    }
+
+    static ByteBuffer fromComparableBytesMap(ByteSource.Peekable comparableBytes,
+                                             Version version,
+                                             AbstractType<?> keysComparator,
+                                             AbstractType<?> valuesComparator)
+    {
+        List<ByteBuffer> buffers = new ArrayList<>();
+        int terminator = version == Version.LEGACY
+                         ? 0x00
+                         : ByteSource.TERMINATOR;
+        int separator = comparableBytes.next();
+        while (separator != terminator)
+        {
+            buffers.add(ByteSourceUtil.nextComponentNull(separator)
+                        ? null
+                        : keysComparator.fromComparableBytes(comparableBytes, version));
+            separator = comparableBytes.next();
+            buffers.add(ByteSourceUtil.nextComponentNull(separator)
+                        ? null
+                        : valuesComparator.fromComparableBytes(comparableBytes, version));
+            separator = comparableBytes.next();
+        }
+        return CollectionSerializer.pack(buffers, buffers.size() / 2, ProtocolVersion.V3);
     }
 
     @Override

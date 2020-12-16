@@ -28,9 +28,10 @@ import org.apache.cassandra.serializers.SimpleDateSerializer;
 import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.ByteComparable;
-import org.apache.cassandra.utils.ByteComparable.Version;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
 
 import static org.apache.cassandra.cql3.statements.RequestValidations.invalidRequest;
 
@@ -44,9 +45,14 @@ public class SimpleDateType extends TemporalType<Integer>
     public ByteSource asComparableBytes(ByteBuffer buf, Version version)
     {
         // While BYTE_ORDER would still work for this type, making use of the fixed length is more efficient.
-        return version == Version.LEGACY
-               ? ByteSource.fixedLength(buf)
-               : ByteSource.optionalFixedLength(buf);
+        // This type does not allow non-present values, but we do just to avoid future complexity.
+        return ByteSource.optionalFixedLength(buf);
+    }
+
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    {
+        return ByteSourceUtil.getOptionalFixedLength(comparableBytes, 4);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

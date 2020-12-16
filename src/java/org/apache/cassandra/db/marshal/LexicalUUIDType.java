@@ -26,8 +26,9 @@ import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.serializers.UUIDSerializer;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.ByteComparable;
-import org.apache.cassandra.utils.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable;
+import org.apache.cassandra.utils.bytecomparable.ByteSource;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
 
 public class LexicalUUIDType extends AbstractType<UUID>
 {
@@ -74,6 +75,12 @@ public class LexicalUUIDType extends AbstractType<UUID>
                 return v;
             }
         };
+    }
+
+    @Override
+    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    {
+        return ByteSourceUtil.getUuidBytes(comparableBytes, LexicalUUIDType.instance);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

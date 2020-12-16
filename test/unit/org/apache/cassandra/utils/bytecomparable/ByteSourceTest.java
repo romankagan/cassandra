@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.cassandra.utils;
+package org.apache.cassandra.utils.bytecomparable;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -94,7 +94,10 @@ import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.LocalPartitioner;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
-import org.apache.cassandra.utils.ByteComparable.Version;
+import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.utils.MurmurHash;
+import org.apache.cassandra.utils.UUIDGen;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
 
 import static org.junit.Assert.assertEquals;
 
@@ -168,8 +171,8 @@ public class ByteSourceTest
     BigDecimal[] testBigDecimals;
     {
         String vals = "0, 1, 1.1, 21, 98.9, 99, 99.9, 100, 100.1, 101, 331, 0.4, 0.07, 0.0700, 0.005, " +
-                      "6e4, 7e200, 6e-300, 8.1e2000, 8.1e-2000, 9e2000, " +
-                      "123456789012.34567890e-1000, 123456.78901234, 1234.56789012e2, " +
+                      "6e4, 7e200, 6e-300, 8.1e2000, 8.1e-2000, 9e2000000000, " +
+                      "123456789012.34567890e-1000000000, 123456.78901234, 1234.56789012e2, " +
                       "1.0000, 0.01e2, 100e-2, 00, 0.000, 0E-18, 0E+18";
         List<BigDecimal> decs = new ArrayList<>();
         for (String s : vals.split(", "))
@@ -427,9 +430,9 @@ public class ByteSourceTest
     }
 
     ClusteringPrefix.Kind[] kinds = new ClusteringPrefix.Kind[] {
-    ClusteringPrefix.Kind.INCL_START_BOUND,
-    ClusteringPrefix.Kind.CLUSTERING,
-    ClusteringPrefix.Kind.EXCL_START_BOUND,
+    	ClusteringPrefix.Kind.INCL_START_BOUND,
+    	ClusteringPrefix.Kind.CLUSTERING,
+    	ClusteringPrefix.Kind.EXCL_START_BOUND,
     };
 
     interface PairTester
@@ -937,7 +940,7 @@ public class ByteSourceTest
         }
     }
 
-    private Object safeStr(Object i)
+    static Object safeStr(Object i)
     {
         if (i == null)
             return null;
@@ -1013,7 +1016,7 @@ public class ByteSourceTest
         int paddedCapacity = b.remaining() + padBefore + padAfter;
         ByteBuffer padded = allocateBuffer(paddedCapacity);
         rand.ints(padBefore).forEach(x -> padded.put((byte) x));
-        padded.put(b);
+        padded.put(b.duplicate());
         rand.ints(padAfter).forEach(x -> padded.put((byte) x));
         padded.clear().limit(padded.capacity() - padAfter).position(padBefore);
         return padded;

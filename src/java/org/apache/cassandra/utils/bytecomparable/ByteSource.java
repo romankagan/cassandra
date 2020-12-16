@@ -15,12 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.cassandra.utils;
+package org.apache.cassandra.utils.bytecomparable;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-import org.apache.cassandra.utils.ByteComparable.Version;
+import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
+import org.apache.cassandra.utils.memory.MemoryUtil;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -62,6 +63,9 @@ public interface ByteSource
     int LT_NEXT_COMPONENT = 0x20;
     int GT_NEXT_COMPONENT = 0x60;
 
+    // Special value for components that should be excluded from the normal min/max span. (static rows)
+    int EXCLUDED = 0x18;
+
     /**
      * Reinterprets a byte buffer as a byte-comparable source that has 0s escaped and finishes in an escape.
      * This provides a weakly-prefix-free byte-comparable version of the content to use in sequences.
@@ -80,6 +84,16 @@ public interface ByteSource
     static ByteSource of(byte[] buf, Version version)
     {
         return new ReinterpreterArray(buf, version);
+    }
+
+    /**
+     * Reinterprets a memory range as a byte-comparable source that has 0s escaped and finishes in an escape.
+     * This provides a weakly-prefix-free byte-comparable version of the content to use in sequences.
+     * (See ByteSource.BufferReinterpreter/Multi for explanation.)
+     */
+    static ByteSource of(long address, int length, ByteComparable.Version version)
+    {
+        return new MemoryReinterpreter(address, length, version);
     }
 
     /**
@@ -370,6 +384,29 @@ public interface ByteSource
         protected int limit()
         {
             return buf.length;
+        }
+    }
+
+    static class MemoryReinterpreter extends AbstractReinterpreter
+    {
+        final long address;
+        final int length;
+
+        MemoryReinterpreter(long address, int length, ByteComparable.Version version)
+        {
+            super(0, version);
+            this.address = address;
+            this.length = length;
+        }
+
+        protected byte get(int index)
+        {
+            return MemoryUtil.getByte(address + index);
+        }
+
+        protected int limit()
+        {
+            return length;
         }
     }
 
