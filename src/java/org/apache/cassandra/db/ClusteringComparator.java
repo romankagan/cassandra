@@ -309,7 +309,7 @@ public class ClusteringComparator implements Comparator<Clusterable>
                     if (srcnum == sz)
                         return src.kind().asByteComparableValue(version);
 
-                    current = subtype(srcnum).asComparableBytes(src.accessor().toBuffer(src.get(srcnum)), version);
+                    current = subtype(srcnum).asComparableBytes(src.accessor(), src.get(srcnum), version);
                     if (current == null)
                         return subtype(srcnum).isReversed() ? NEXT_COMPONENT_NULL_REVERSED : NEXT_COMPONENT_NULL;
 
@@ -324,7 +324,9 @@ public class ClusteringComparator implements Comparator<Clusterable>
         }
     }
 
-    public Clustering<ByteBuffer> clusteringFromOrderedBytes(ByteSource.Peekable orderedBytes, ByteComparable.Version version)
+    public <V> Clustering<V> clusteringFromOrderedBytes(ValueAccessor<V> accessor,
+                                                        ByteSource.Peekable orderedBytes,
+                                                        ByteComparable.Version version)
     {
         assert version == ByteComparable.Version.LEGACY;
         if (orderedBytes == null)
@@ -336,14 +338,14 @@ public class ClusteringComparator implements Comparator<Clusterable>
         {
         case TERMINATOR:
             assert size() == 0 : "Terminator should be after " + size() + " components, got 0";
-            return Clustering.EMPTY;
+            return accessor.factory().clustering();
         case EXCLUDED:
-            return Clustering.STATIC_CLUSTERING;
+            return accessor.factory().staticClustering();
         // else continue with processing
         }
 
         int cc = 0;
-        ByteBuffer[] components = new ByteBuffer[size()];
+        V[] components = accessor.createArray(size());
 
         while (true)
         {
@@ -354,11 +356,11 @@ public class ClusteringComparator implements Comparator<Clusterable>
                 components[cc] = null;
                 break;
             case NEXT_COMPONENT:
-                components[cc] = subtype(cc).fromComparableBytes(orderedBytes, version);
+                components[cc] = subtype(cc).fromComparableBytes(accessor, orderedBytes, version);
                 break;
             case TERMINATOR:
                 assert cc == size() : "Terminator should be after " + size() + " components, got " + cc;
-                return new BufferClustering(components);
+                return accessor.factory().clustering(components);
             case EXCLUDED:
                 throw new AssertionError("Unexpected static terminator after the first component");
             default:
@@ -369,7 +371,9 @@ public class ClusteringComparator implements Comparator<Clusterable>
         }
     }
 
-    public ClusteringBound<ByteBuffer> boundFromOrderedBytes(ByteSource.Peekable orderedBytes, ByteComparable.Version version, boolean isEnd)
+    public <V> ClusteringBound<V> boundFromOrderedBytes(ValueAccessor<V> accessor,
+                                                        ByteSource.Peekable orderedBytes,
+                                                        ByteComparable.Version version, boolean isEnd)
     {
         assert version == ByteComparable.Version.LEGACY;
         if (orderedBytes == null)
@@ -378,7 +382,7 @@ public class ClusteringComparator implements Comparator<Clusterable>
         // First check for special cases (partition key only, static clustering) that can do without buffers.
         int sep = orderedBytes.next();
         int cc = 0;
-        ByteBuffer[] components = new ByteBuffer[size()];
+        V[] components = accessor.createArray(size());
 
         while (true)
         {
@@ -389,16 +393,14 @@ public class ClusteringComparator implements Comparator<Clusterable>
                 components[cc] = null;
                 break;
             case NEXT_COMPONENT:
-                components[cc] = subtype(cc).fromComparableBytes(orderedBytes, version);
+                components[cc] = subtype(cc).fromComparableBytes(accessor, orderedBytes, version);
                 break;
             case ByteSource.LT_NEXT_COMPONENT:
-                return isEnd ?
-                       BufferClusteringBound.exclusiveEndOf(Arrays.copyOf(components, cc)) :
-                       BufferClusteringBound.inclusiveStartOf(Arrays.copyOf(components, cc));
+                return accessor.factory().bound(isEnd ? ClusteringPrefix.Kind.EXCL_END_BOUND : ClusteringPrefix.Kind.INCL_START_BOUND,
+                                                Arrays.copyOf(components, cc));
             case ByteSource.GT_NEXT_COMPONENT:
-                return isEnd ?
-                       BufferClusteringBound.inclusiveEndOf(Arrays.copyOf(components, cc)) :
-                       BufferClusteringBound.exclusiveStartOf(Arrays.copyOf(components, cc));
+                return accessor.factory().bound(isEnd ? ClusteringPrefix.Kind.INCL_END_BOUND : ClusteringPrefix.Kind.EXCL_START_BOUND,
+                                                Arrays.copyOf(components, cc));
             default:
                 throw new AssertionError("Unexpected separator " + Integer.toHexString(sep) + " in ClusteringBound encoding");
             }
@@ -407,7 +409,9 @@ public class ClusteringComparator implements Comparator<Clusterable>
         }
     }
 
-    public ClusteringBoundary<ByteBuffer> boundaryFromOrderedBytes(ByteSource.Peekable orderedBytes, ByteComparable.Version version)
+    public <V> ClusteringBoundary<V> boundaryFromOrderedBytes(ValueAccessor<V> accessor,
+                                                              ByteSource.Peekable orderedBytes,
+                                                              ByteComparable.Version version)
     {
         assert version == ByteComparable.Version.LEGACY;
         if (orderedBytes == null)
@@ -416,7 +420,7 @@ public class ClusteringComparator implements Comparator<Clusterable>
         // First check for special cases (partition key only, static clustering) that can do without buffers.
         int sep = orderedBytes.next();
         int cc = 0;
-        ByteBuffer[] components = new ByteBuffer[size()];
+        V[] components = accessor.createArray(size());
 
         while (true)
         {
@@ -427,14 +431,14 @@ public class ClusteringComparator implements Comparator<Clusterable>
                 components[cc] = null;
                 break;
             case NEXT_COMPONENT:
-                components[cc] = subtype(cc).fromComparableBytes(orderedBytes, version);
+                components[cc] = subtype(cc).fromComparableBytes(accessor, orderedBytes, version);
                 break;
             case ByteSource.LT_NEXT_COMPONENT:
-                return BufferClusteringBoundary.create(ClusteringPrefix.Kind.EXCL_END_INCL_START_BOUNDARY,
-                                                       Arrays.copyOf(components, cc));
+                return accessor.factory().boundary(ClusteringPrefix.Kind.EXCL_END_INCL_START_BOUNDARY,
+                                                   Arrays.copyOf(components, cc));
             case ByteSource.GT_NEXT_COMPONENT:
-                return BufferClusteringBoundary.create(ClusteringPrefix.Kind.INCL_END_EXCL_START_BOUNDARY,
-                                                       Arrays.copyOf(components, cc));
+                return accessor.factory().boundary(ClusteringPrefix.Kind.INCL_END_EXCL_START_BOUNDARY,
+                                                   Arrays.copyOf(components, cc));
             default:
                 throw new AssertionError("Unexpected separator " + Integer.toHexString(sep) + " in ClusteringBoundary encoding");
             }

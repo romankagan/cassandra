@@ -47,16 +47,16 @@ public class ByteType extends NumberType<Byte>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer buf, Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, Version version)
     {
         // This type does not allow non-present values, but we do just to avoid future complexity.
-        return ByteSource.optionalSignedFixedLengthNumber(buf);
+        return ByteSource.optionalSignedFixedLengthNumber(accessor, data);
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getOptionalSignedFixedLength(comparableBytes, 1);
+        return ByteSourceUtil.getOptionalSignedFixedLength(accessor, comparableBytes, 1);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

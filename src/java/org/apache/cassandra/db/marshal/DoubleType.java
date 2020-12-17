@@ -54,15 +54,15 @@ public class DoubleType extends NumberType<Double>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer buf, ByteComparable.Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version version)
     {
-        return ByteSource.optionalSignedFixedLengthFloat(buf);
+        return ByteSource.optionalSignedFixedLengthFloat(accessor, data);
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getOptionalSignedFixedLengthFloat(comparableBytes, 8);
+        return ByteSourceUtil.getOptionalSignedFixedLengthFloat(accessor, comparableBytes, 8);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

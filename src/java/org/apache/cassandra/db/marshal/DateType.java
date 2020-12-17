@@ -54,16 +54,16 @@ public class DateType extends AbstractType<Date>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer buf, ByteComparable.Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version version)
     {
         // While BYTE_ORDER would still work for this type, making use of the fixed length is more efficient.
-        return ByteSource.optionalFixedLength(buf);
+        return ByteSource.optionalFixedLength(accessor, data);
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getOptionalFixedLength(comparableBytes, 8);
+        return ByteSourceUtil.getOptionalFixedLength(accessor, comparableBytes, 8);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

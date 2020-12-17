@@ -42,17 +42,17 @@ public class SimpleDateType extends TemporalType<Integer>
     SimpleDateType() {super(ComparisonType.BYTE_ORDER);} // singleton
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer buf, Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, Version version)
     {
         // While BYTE_ORDER would still work for this type, making use of the fixed length is more efficient.
         // This type does not allow non-present values, but we do just to avoid future complexity.
-        return ByteSource.optionalFixedLength(buf);
+        return ByteSource.optionalFixedLength(accessor, data);
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getOptionalFixedLength(comparableBytes, 4);
+        return ByteSourceUtil.getOptionalFixedLength(accessor, comparableBytes, 4);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

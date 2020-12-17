@@ -53,7 +53,7 @@ public class DecimalType extends NumberType<BigDecimal>
     private static final byte DECIMAL_LAST_BYTE = (byte) 0x00;
     private static final BigInteger HUNDRED = BigInteger.valueOf(100);
 
-    private static final ByteBuffer ZERO_BUFFER = instance.decompose(BigDecimal.ZERO);
+    private static final ByteBuffer ZERO_ARRAY = instance.decompose(BigDecimal.ZERO);
 
     DecimalType() {super(ComparisonType.CUSTOM);} // singleton
 
@@ -110,9 +110,9 @@ public class DecimalType extends NumberType<BigDecimal>
      *
      */
     @Override
-    public ByteSource asComparableBytes(ByteBuffer buf, ByteComparable.Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version version)
     {
-        BigDecimal value = compose(buf);
+        BigDecimal value = compose(data, accessor);
         if (value == null)
             return null;
         if (value.compareTo(BigDecimal.ZERO) == 0)  // Note: 0.equals(0.0) returns false!
@@ -173,14 +173,14 @@ public class DecimalType extends NumberType<BigDecimal>
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
         if (comparableBytes == null)
-            return ByteBufferUtil.EMPTY_BYTE_BUFFER;
+            return accessor.empty();
 
         int headerBits = comparableBytes.next();
         if (headerBits == POSITIVE_DECIMAL_HEADER_MASK)
-            return ZERO_BUFFER;
+            return accessor.valueOf(ZERO_ARRAY);
 
         // I. Extract the exponent.
         // The sign of the decimal, and the sign and the length (in bytes) of the decimal exponent, are all encoded in
@@ -247,10 +247,9 @@ public class DecimalType extends NumberType<BigDecimal>
         // "multiplying by a positive power of 10", but to BigDecimal's internal scale representation, where a positive
         // number means "dividing by a positive power of 10".
         byte[] mantissaBytes = mantissa.toByteArray();
-        ByteBuffer resultBuf = ByteBuffer.allocate(4 + mantissaBytes.length);
-        resultBuf.putInt((int) -base10NonBigDecimalFormatExp);
-        resultBuf.put(mantissaBytes);
-        resultBuf.rewind();
+        V resultBuf = accessor.allocate(4 + mantissaBytes.length);
+        accessor.putInt(resultBuf, 0, (int) -base10NonBigDecimalFormatExp);
+        accessor.copyByteArrayTo(mantissaBytes, 0, resultBuf, 4, mantissaBytes.length);
         return resultBuf;
     }
 

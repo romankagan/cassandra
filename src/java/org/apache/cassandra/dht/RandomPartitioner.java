@@ -27,6 +27,8 @@ import java.util.*;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.cassandra.db.CachedHashDecoratedKey;
+import org.apache.cassandra.db.marshal.ByteArrayAccessor;
+import org.apache.cassandra.db.marshal.ByteBufferAccessor;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.marshal.AbstractType;
@@ -162,7 +164,7 @@ public class RandomPartitioner implements IPartitioner
     {
         public Token fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
         {
-            return fromByteArray(IntegerType.instance.fromComparableBytes(comparableBytes, version));
+            return fromByteArray(IntegerType.instance.fromComparableBytes(ByteBufferAccessor.instance, comparableBytes, version));
         }
 
         public ByteBuffer toByteArray(Token token)
@@ -254,7 +256,7 @@ public class RandomPartitioner implements IPartitioner
         @Override
         public ByteSource asComparableBytes(ByteComparable.Version version)
         {
-            return IntegerType.instance.asComparableBytes(ByteBuffer.wrap(token.toByteArray()), version);
+            return IntegerType.instance.asComparableBytes(ByteArrayAccessor.instance, token.toByteArray(), version);
         }
 
         @Override

@@ -160,15 +160,15 @@ public class SetType<T> extends CollectionType<Set<T>>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer b, ByteComparable.Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version version)
     {
-        return ListType.asComparableBytesListOrSet(getElementsType(), b, version);
+        return ListType.asComparableBytesListOrSet(getElementsType(), accessor, data, version);
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ListType.fromComparableBytesListOrSet(comparableBytes, version, getElementsType());
+        return ListType.fromComparableBytesListOrSet(accessor, comparableBytes, version, getElementsType());
     }
 
     public SetSerializer<T> getSerializer()

@@ -598,17 +598,22 @@ public abstract class AbstractType<T> implements Comparator<ByteBuffer>, Assignm
      * Depending on the type, this method can be called for null or empty input, in which case the output is allowed to
      * be null (the clustering/tuple encoding will accept and handle it).
      */
-    public ByteSource asComparableBytes(ByteBuffer byteBuffer, ByteComparable.Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V value, ByteComparable.Version version)
     {
         if (isByteOrderComparable)
         {
             // When a type is byte-ordered on its own, we only need to escape it, so that we can include it in
             // multi-component types and make the encoding weakly-prefix-free.
-            return ByteSource.of(byteBuffer, version);
+            return ByteSource.of(accessor, value, version);
         }
         else
             // default is only good for byte-comparables
             throw new UnsupportedOperationException(getClass().getSimpleName() + " does not implement asComparableBytes");
+    }
+
+    public final ByteSource asComparableBytes(ByteBuffer byteBuffer, ByteComparable.Version version)
+    {
+        return asComparableBytes(ByteBufferAccessor.instance, byteBuffer, version);
     }
 
     /**
@@ -621,20 +626,25 @@ public abstract class AbstractType<T> implements Comparator<ByteBuffer>, Assignm
      * @return A {@link ByteBuffer} of a payload for this abstract type, corresponding to the given byte-ordered
      * representation.
      *
-     * @see #asComparableBytes(ByteBuffer, ByteComparable.Version)
+     * @see #asComparableBytes
      */
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
         if (isByteOrderComparable)
         {
             // For BYTE_ORDER, asComparableBytes() never create a null source, so we shouldn't get one when decoding
             assert comparableBytes != null;
-            return ByteBuffer.wrap(ByteSourceUtil.getUnescapedBytes(comparableBytes));
+            return accessor.valueOf(ByteSourceUtil.getUnescapedBytes(comparableBytes));
         }
         else
         {
             throw new UnsupportedOperationException(getClass().getSimpleName() + " does not implement fromComparableBytes");
         }
+    }
+
+    public final ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    {
+        return fromComparableBytes(ByteBufferAccessor.instance, comparableBytes, version);
     }
 
     /**

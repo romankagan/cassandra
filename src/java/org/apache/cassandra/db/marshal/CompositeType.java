@@ -170,28 +170,33 @@ public class CompositeType extends AbstractCompositeType
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer byteBuffer, Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, Version version)
     {
-        if (byteBuffer == null || byteBuffer.remaining() == 0)
+        if (data == null || accessor.isEmpty(data))
             return null;
 
         ByteSource[] srcs = new ByteSource[types.size() * 2 + 1];
-        ByteBuffer bb = byteBuffer.duplicate();
+        int length = accessor.size(data);
 
         // statics go first
-        boolean isStatic = readStatic(bb);
+        boolean isStatic = readIsStaticInternal(data, accessor);
+        int offset = startingOffsetInternal(isStatic);
         srcs[0] = isStatic ? null : ByteSource.EMPTY;
 
         int i = 0;
         byte lastEoc = 0;
-        while (bb.remaining() > 0)
+        while (offset < length)
         {
             // Only the end-of-component byte of the last component of this composite can be non-zero, so the
             // component before can't have a non-zero end-of-component byte.
             assert lastEoc == 0 : lastEoc;
 
-            srcs[i * 2 + 1] = types.get(i).asComparableBytes(ByteBufferUtil.readBytesWithShortLength(bb), version);
-            lastEoc = bb.get();
+            int componentLength = accessor.getUnsignedShort(data, offset);
+            offset += 2;
+            srcs[i * 2 + 1] = types.get(i).asComparableBytes(accessor, accessor.slice(data, offset, componentLength), version);
+            offset += componentLength;
+            lastEoc = accessor.getByte(data, offset);
+            offset += 1;
             srcs[i * 2 + 2] = ByteSource.oneByte(lastEoc & 0xFF ^ 0x80); // end-of-component also takes part in comparison as signed byte
             ++i;
         }
@@ -203,7 +208,7 @@ public class CompositeType extends AbstractCompositeType
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, Version version)
     {
         // For ByteComparable.Version.LEGACY the terminator byte is ByteSource.END_OF_STREAM. The latter means that it's
         // indistinguishable from the END_OF_STREAM byte that gets returned _after_ the terminator byte has already
@@ -216,12 +221,12 @@ public class CompositeType extends AbstractCompositeType
         assert version != Version.LEGACY;
 
         if (comparableBytes == null)
-            return ByteBufferUtil.EMPTY_BYTE_BUFFER;
+            return accessor.empty();
 
         int separator = comparableBytes.next();
         boolean isStatic = ByteSourceUtil.nextComponentNull(separator);
         int i = 0;
-        ByteBuffer[] buffers = new ByteBuffer[types.size()];
+        V[] buffers = accessor.createArray(types.size());
         byte lastEoc = 0;
 
         while ((separator = comparableBytes.next()) != ByteSource.TERMINATOR && i < types.size())
@@ -232,13 +237,14 @@ public class CompositeType extends AbstractCompositeType
 
             // Get the next type and decode its payload.
             AbstractType<?> type = types.get(i);
-            ByteBuffer decoded = type.fromComparableBytes(ByteSourceUtil.nextComponentSource(comparableBytes, separator),
-                                                          version);
+            V decoded = type.fromComparableBytes(accessor,
+                                                 ByteSourceUtil.nextComponentSource(comparableBytes, separator),
+                                                 version);
             buffers[i++] = decoded;
 
             lastEoc = ByteSourceUtil.getByte(ByteSourceUtil.nextComponentSource(comparableBytes));
         }
-        return build(ByteBufferAccessor.instance, isStatic, Arrays.copyOf(buffers, i), lastEoc);
+        return build(accessor, isStatic, Arrays.copyOf(buffers, i), lastEoc);
     }
 
     protected ParsedComparator parseComparator(int i, String part)

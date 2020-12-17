@@ -164,17 +164,17 @@ public final class IntegerType extends NumberType<BigInteger>
      *    2^33          as 840100000000
      */
     @Override
-    public ByteSource asComparableBytes(ByteBuffer buf, ByteComparable.Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version version)
     {
-        int p = buf.position();
-        final int limit = buf.limit();
+        int p = 0;
+        final int limit = accessor.size(data);
         if (p == limit)
             return null;
 
         // skip padding
-        final byte signbyte = buf.get(p);
+        final byte signbyte = accessor.getByte(data, p);
         if (signbyte == (byte) POSITIVE_VARINT_LENGTH_HEADER || signbyte == (byte) NEGATIVE_VARINT_LENGTH_HEADER)
-            while (p + 1 < limit && buf.get(++p) == signbyte) {}
+            while (p + 1 < limit && accessor.getByte(data, ++p) == signbyte) {}
         final int startpos = p;
 
         return new ByteSource()
@@ -201,16 +201,16 @@ public final class IntegerType extends NumberType<BigInteger>
                 if (pos == limit)
                     return END_OF_STREAM;
 
-                return buf.get(pos++) & 0xFF;
+                return accessor.getByte(data, pos++) & 0xFF;
             }
         };
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
         if (comparableBytes == null)
-            return ByteBufferUtil.EMPTY_BYTE_BUFFER;
+            return accessor.empty();
 
         // Consume the first byte to determine whether the encoded number is positive.
         int curr = comparableBytes.next();
@@ -246,7 +246,7 @@ public final class IntegerType extends NumberType<BigInteger>
         while (writtenBytes < buf.length)
             buf[writtenBytes++] = (byte) comparableBytes.next();
 
-        return ByteBuffer.wrap(buf);
+        return accessor.valueOf(buf);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

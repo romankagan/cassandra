@@ -64,15 +64,15 @@ public class TimestampType extends TemporalType<Date>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer buf, ByteComparable.Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version version)
     {
-        return ByteSource.optionalSignedFixedLengthNumber(buf);
+        return ByteSource.optionalSignedFixedLengthNumber(accessor, data);
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getOptionalSignedFixedLength(comparableBytes, 8);
+        return ByteSourceUtil.getOptionalSignedFixedLength(accessor, comparableBytes, 8);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

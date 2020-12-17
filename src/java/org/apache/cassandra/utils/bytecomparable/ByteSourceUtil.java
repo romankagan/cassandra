@@ -26,7 +26,7 @@ import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.LexicalUUIDType;
 import org.apache.cassandra.db.marshal.TimeUUIDType;
 import org.apache.cassandra.db.marshal.UUIDType;
-import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.db.marshal.ValueAccessor;
 
 /**
  * Contains various utilities for working with {@link ByteSource}s.
@@ -61,7 +61,7 @@ public final class ByteSourceUtil
         return result;
     }
 
-    public static ByteBuffer getSignedFixedLength(ByteSource byteSource, int length)
+    public static <V> V getSignedFixedLength(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
         if (byteSource == null)
             throw new IllegalArgumentException("Unexpected null ByteSource");
@@ -69,8 +69,8 @@ public final class ByteSourceUtil
             throw new IllegalArgumentException("At least 1 byte should be read");
 
         // Maybe consider passing down allocation strategy (on-heap vs direct)?
-        ByteBuffer result = ByteBuffer.allocate(length);
-        result.put(0, (byte) (byteSource.next() ^ SIGN_MASK));
+        V result = accessor.allocate(length);
+        accessor.putByte(result, 0, (byte) (byteSource.next() ^ SIGN_MASK));
         for (int i = 1; i < length; ++i)
         {
             int data = byteSource.next();
@@ -78,17 +78,17 @@ public final class ByteSourceUtil
                 throw new IllegalArgumentException(
                         String.format("Unexpected end of stream reached after %d bytes (expected >= %d)", i, length));
             assert data >= 0 && data <= 255;
-            result.put(i, (byte) data);
+            accessor.putByte(result, i, (byte) data);
         }
         return result;
     }
 
-    public static ByteBuffer getOptionalSignedFixedLength(ByteSource byteSource, int length)
+    public static <V> V getOptionalSignedFixedLength(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
-        return byteSource == null ? ByteBufferUtil.EMPTY_BYTE_BUFFER : getSignedFixedLength(byteSource, length);
+        return byteSource == null ? accessor.empty() : getSignedFixedLength(accessor, byteSource, length);
     }
 
-    public static ByteBuffer getSignedFixedLengthFloat(ByteSource byteSource, int length)
+    public static <V> V getSignedFixedLengthFloat(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
         if (byteSource == null)
             throw new IllegalArgumentException("Unexpected null ByteSource");
@@ -96,7 +96,7 @@ public final class ByteSourceUtil
             throw new IllegalArgumentException("At least 1 byte should be read");
 
         // Maybe consider passing down allocation strategy (on-heap vs direct)?
-        ByteBuffer result = ByteBuffer.allocate(length);
+        V result = accessor.allocate(length);
         int first = byteSource.next() & 0xFF;
         int xor = 0;
         if (first < 0x80) // the encoding puts negative numbers below positives
@@ -106,7 +106,7 @@ public final class ByteSourceUtil
         }
         else
             first ^= SIGN_MASK;
-        result.put(0, (byte) first);
+        accessor.putByte(result, 0, (byte) first);
 
         for (int i = 1; i < length; ++i)
         {
@@ -116,17 +116,17 @@ public final class ByteSourceUtil
                 String.format("Unexpected end of stream reached after %d bytes (expected >= %d)", i, length));
             assert data >= 0 && data <= 255;
             data ^= xor;
-            result.put(i, (byte) data);
+            accessor.putByte(result, i, (byte) data);
         }
         return result;
     }
 
-    public static ByteBuffer getOptionalSignedFixedLengthFloat(ByteSource byteSource, int length)
+    public static <V> V getOptionalSignedFixedLengthFloat(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
-        return byteSource == null ? ByteBufferUtil.EMPTY_BYTE_BUFFER : getSignedFixedLengthFloat(byteSource, length);
+        return byteSource == null ? accessor.empty() : getSignedFixedLengthFloat(accessor, byteSource, length);
     }
 
-    public static ByteBuffer getFixedLength(ByteSource byteSource, int length)
+    public static <V> V getFixedLength(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
         if (byteSource == null)
             throw new IllegalArgumentException("Unexpected null ByteSource");
@@ -134,7 +134,7 @@ public final class ByteSourceUtil
             throw new IllegalArgumentException("At least 1 byte should be read");
 
         // Maybe consider passing down allocation strategy (on-heap vs direct)?
-        ByteBuffer result = ByteBuffer.allocate(length);
+        V result = accessor.allocate(length);
         for (int i = 0; i < length; ++i)
         {
             int data = byteSource.next();
@@ -142,14 +142,14 @@ public final class ByteSourceUtil
                 throw new IllegalArgumentException(
                         String.format("Unexpected end of stream reached after %d bytes (expected >= %d)", i, length));
             assert data >= 0 && data <= 255;
-            result.put(i, (byte) data);
+            accessor.putByte(result, i, (byte) data);
         }
         return result;
     }
 
-    public static ByteBuffer getOptionalFixedLength(ByteSource byteSource, int length)
+    public static <V> V getOptionalFixedLength(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
-        return byteSource == null ? ByteBufferUtil.EMPTY_BYTE_BUFFER : getFixedLength(byteSource, length);
+        return byteSource == null ? accessor.empty() : getFixedLength(accessor, byteSource, length);
     }
 
     /**
@@ -235,11 +235,11 @@ public final class ByteSourceUtil
      *
      * @see UUID
      */
-    public static ByteBuffer getUuidBytes(ByteSource byteSource, AbstractType<UUID> uuidType)
+    public static <V> V getUuidBytes(ValueAccessor<V> accessor, ByteSource byteSource, AbstractType<UUID> uuidType)
     {
         // Optional-style encoding of empty values as null sources
         if (byteSource == null)
-            return ByteBufferUtil.EMPTY_BYTE_BUFFER;
+            return accessor.empty();
 
         long hiBits = getLong(byteSource);
         long loBits = getLong(byteSource);
@@ -248,7 +248,7 @@ public final class ByteSourceUtil
         {
             // Lexical UUIDs are stored as just two longs (with their sign bits flipped). The simple decoding of these
             // longs flips their sign bit back, so they can directly be used for constructing the original UUID.
-            return makeUuidBytes(hiBits, loBits);
+            return makeUuidBytes(accessor, hiBits, loBits);
         }
 
         assert uuidType instanceof UUIDType || uuidType instanceof TimeUUIDType;
@@ -283,15 +283,14 @@ public final class ByteSourceUtil
                      | hiBits & 0x0000000000000FFFL;
         }
 
-        return makeUuidBytes(hiBits, loBits);
+        return makeUuidBytes(accessor, hiBits, loBits);
     }
 
-    private static ByteBuffer makeUuidBytes(long high, long low)
+    private static <V> V makeUuidBytes(ValueAccessor<V> accessor, long high, long low)
     {
-        ByteBuffer buffer = ByteBuffer.allocate(16);
-        buffer.putLong(high);
-        buffer.putLong(low);
-        buffer.flip();
+        V buffer = accessor.allocate(16);
+        accessor.putLong(buffer, 0, high);
+        accessor.putLong(buffer, 8, low);
         return buffer;
     }
 

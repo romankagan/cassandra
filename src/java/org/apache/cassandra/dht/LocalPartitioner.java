@@ -26,6 +26,7 @@ import java.util.Random;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.CachedHashDecoratedKey;
 import org.apache.cassandra.db.marshal.AbstractType;
+import org.apache.cassandra.db.marshal.ByteBufferAccessor;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
@@ -87,7 +88,7 @@ public class LocalPartitioner implements IPartitioner
     {
         public Token fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
         {
-            ByteBuffer tokenData = comparator.fromComparableBytes(comparableBytes, version);
+            ByteBuffer tokenData = comparator.fromComparableBytes(ByteBufferAccessor.instance, comparableBytes, version);
             return new LocalToken(tokenData);
         }
 
@@ -185,7 +186,7 @@ public class LocalPartitioner implements IPartitioner
         @Override
         public ByteSource asComparableBytes(ByteComparable.Version version)
         {
-            return comparator.asComparableBytes(token, version);
+            return comparator.asComparableBytes(ByteBufferAccessor.instance, token, version);
         }
 
         @Override

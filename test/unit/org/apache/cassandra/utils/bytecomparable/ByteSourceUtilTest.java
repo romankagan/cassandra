@@ -199,19 +199,19 @@ public class ByteSourceUtilTest
         {
             ByteBuffer uuidBuffer = UUIDType.instance.decompose(initial);
             ByteSource byteSource = UUIDType.instance.asComparableBytes(uuidBuffer, version);
-            UUID decoded = UUIDType.instance.compose(ByteSourceUtil.getUuidBytes(byteSource, UUIDType.instance));
+            UUID decoded = UUIDType.instance.compose(ByteSourceUtil.getUuidBytes(ByteBufferAccessor.instance, byteSource, UUIDType.instance));
             Assert.assertEquals(initial, decoded);
 
             uuidBuffer = LexicalUUIDType.instance.decompose(initial);
             byteSource = LexicalUUIDType.instance.asComparableBytes(uuidBuffer, version);
-            decoded = LexicalUUIDType.instance.compose(ByteSourceUtil.getUuidBytes(byteSource, LexicalUUIDType.instance));
+            decoded = LexicalUUIDType.instance.compose(ByteSourceUtil.getUuidBytes(ByteBufferAccessor.instance, byteSource, LexicalUUIDType.instance));
             Assert.assertEquals(initial, decoded);
 
             if (initial == null || initial.version() == 1)
             {
                 uuidBuffer = TimeUUIDType.instance.decompose(initial);
                 byteSource = TimeUUIDType.instance.asComparableBytes(uuidBuffer, version);
-                decoded = TimeUUIDType.instance.compose(ByteSourceUtil.getUuidBytes(byteSource, TimeUUIDType.instance));
+                decoded = TimeUUIDType.instance.compose(ByteSourceUtil.getUuidBytes(ByteBufferAccessor.instance, byteSource, TimeUUIDType.instance));
                 Assert.assertEquals(initial, decoded);
             }
         };

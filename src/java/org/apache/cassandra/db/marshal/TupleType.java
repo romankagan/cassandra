@@ -204,12 +204,12 @@ public class TupleType extends AbstractType<ByteBuffer>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer byteBuffer, ByteComparable.Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version version)
     {
-        ByteBuffer[] bufs = split(byteBuffer);  // this may be shorter than types.size -- other srcs remain null in that case
+        V[] bufs = split(accessor, data);  // this may be shorter than types.size -- other srcs remain null in that case
         ByteSource[] srcs = new ByteSource[types.size()];
         for (int i = 0; i < bufs.length; ++i)
-            srcs[i] = types.get(i).asComparableBytes(bufs[i], version);
+            srcs[i] = types.get(i).asComparableBytes(accessor, bufs[i], version);
         // We always have a fixed number of sources, with the trailing ones possibly being nulls.
         // This can only result in a prefix if the last type in the tuple allows prefixes. Since that type is required
         // to be weakly prefix-free, so is the tuple.
@@ -217,41 +217,47 @@ public class TupleType extends AbstractType<ByteBuffer>
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        ByteBuffer[] componentBuffers = new ByteBuffer[types.size()];
+        V[] componentBuffers = accessor.createArray(types.size());
         for (int i = 0; i < types.size(); ++i)
         {
             AbstractType<?> componentType = types.get(i);
             ByteSource.Peekable component = ByteSourceUtil.nextComponentSource(comparableBytes);
-            componentBuffers[i] = componentType.fromComparableBytes(component, version);
+            componentBuffers[i] = componentType.fromComparableBytes(accessor, component, version);
         }
-        return buildValue(componentBuffers);
+        return buildValue(accessor, componentBuffers);
     }
 
     /**
      * Split a tuple value into its component values.
      */
-    public ByteBuffer[] split(ByteBuffer value)
+    public <V> V[] split(ValueAccessor<V> accessor, V value)
     {
-        ByteBuffer[] components = new ByteBuffer[size()];
-        ByteBuffer input = value.duplicate();
+        V[] components = accessor.createArray(size());
+        int length = accessor.size(value);
+        int position = 0;
         for (int i = 0; i < size(); i++)
         {
-            if (!input.hasRemaining())
+            if (position == length)
                 return Arrays.copyOfRange(components, 0, i);
 
-            int size = input.getInt();
+            if (position + 4 > length)
+                throw new MarshalException(String.format("Not enough bytes to read %dth component", i));
 
-            if (input.remaining() < size)
+            int size = accessor.getInt(value, position);
+            position += 4;
+
+            if (position + size > length)
                 throw new MarshalException(String.format("Not enough bytes to read %dth component", i));
 
             // size < 0 means null value
-            components[i] = size < 0 ? null : ByteBufferUtil.readBytes(input, size);
+            components[i] = size < 0 ? null : accessor.slice(value, position, size);
+            position += size;
         }
 
         // error out if we got more values in the tuple/UDT than we expected
-        if (input.hasRemaining())
+        if (position < length)
         {
             throw new InvalidRequestException(String.format(
             "Expected %s %s for %s column, but got more",

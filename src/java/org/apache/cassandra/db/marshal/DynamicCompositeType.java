@@ -207,25 +207,25 @@ public class DynamicCompositeType extends AbstractCompositeType
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer byteBuffer, Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, Version version)
     {
         List<ByteSource> srcs = new ArrayList<>();
-        ByteBuffer bb = byteBuffer.duplicate();
+        int length = accessor.size(data);
 
         // statics go first
-        boolean isStatic = readIsStatic(bb, ByteBufferAccessor.instance);
+        boolean isStatic = readIsStatic(data, accessor);
+        int offset = startingOffset(isStatic);
         srcs.add(isStatic ? null : ByteSource.EMPTY);
-        bb.position(bb.position() + startingOffset(isStatic));
 
         byte lastEoc = 0;
-        while (bb.remaining() > 0)
+        while (offset < length)
         {
             // Only the end-of-component byte of the last component of this composite can be non-zero, so the
             // component before can't have a non-zero end-of-component byte.
             assert lastEoc == 0 : lastEoc;
 
-            AbstractType<?> comp = getComparator(bb, ByteBufferAccessor.instance, 0);
-            bb.position(bb.position() + getComparatorSize(bb, ByteBufferAccessor.instance, 0));
+            AbstractType<?> comp = getComparator(data, accessor, offset);
+            offset += getComparatorSize(data, accessor, offset);
             // The comparable bytes for the component need to ensure comparisons consistent with
             // AbstractCompositeType.compareCustom(ByteBuffer, ByteBuffer) and
             // DynamicCompositeType.getComparator(int, ByteBuffer, ByteBuffer):
@@ -247,9 +247,13 @@ public class DynamicCompositeType extends AbstractCompositeType
                 srcs.add(ByteSource.of(reversedComp.baseType.getClass().getName(), version));
             }
             // Only then the payload of the component gets encoded.
-            srcs.add(comp.asComparableBytes(ByteBufferUtil.readBytesWithShortLength(bb), version));
+            int componentLength = accessor.getUnsignedShort(data, offset);
+            offset += 2;
+            srcs.add(comp.asComparableBytes(accessor, accessor.slice(data, offset, componentLength), version));
+            offset += componentLength;
             // The end-of-component byte also takes part in the comparison, and therefore needs to be encoded.
-            lastEoc = bb.get();
+            lastEoc = accessor.getByte(data, offset);
+            offset += 1;
             srcs.add(ByteSource.oneByte(version == Version.LEGACY ? lastEoc : lastEoc & 0xFF ^ 0x80));
         }
 
@@ -258,7 +262,7 @@ public class DynamicCompositeType extends AbstractCompositeType
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, Version version)
     {
         // For ByteComparable.Version.DSE6 the terminator byte is ByteSource.END_OF_STREAM. Just like with
         // CompositeType, this means that in multi-component sequences the terminator may be transformed to a regular
@@ -271,14 +275,14 @@ public class DynamicCompositeType extends AbstractCompositeType
         assert version != Version.LEGACY;
 
         if (comparableBytes == null)
-            return ByteBufferUtil.EMPTY_BYTE_BUFFER;
+            return accessor.empty();
 
         int separator = comparableBytes.next();
         // We don't actually need isStatic, we just consume it in order to be able to continue past it.
         boolean isStatic = ByteSourceUtil.nextComponentNull(separator);
 
         List<String> types = new ArrayList<>();
-        List<ByteBuffer> values = new ArrayList<>();
+        List<V> values = new ArrayList<>();
         byte lastEoc = 0;
 
         while ((separator = comparableBytes.next()) != ByteSource.TERMINATOR)
@@ -306,25 +310,24 @@ public class DynamicCompositeType extends AbstractCompositeType
             types.add(fullClassName);
 
             // Decode the payload from this type.
-            ByteBuffer value = type.fromComparableBytes(ByteSourceUtil.nextComponentSource(comparableBytes), version);
+            V value = type.fromComparableBytes(accessor, ByteSourceUtil.nextComponentSource(comparableBytes), version);
             values.add(value);
 
             // Also decode the corresponding end-of-component byte - the last one we decode will be taken into
             // account when we deserialize the decoded data into an object.
             lastEoc = ByteSourceUtil.getByte(ByteSourceUtil.nextComponentSource(comparableBytes));
         }
-        ByteBuffer result = build(types, values, lastEoc);
-        result.rewind();
+        V result = build(accessor, types, values, lastEoc);
         return result;
     }
 
     public static ByteBuffer build(List<String> types, List<ByteBuffer> values)
     {
-        return build(types, values, (byte) 0);
+        return build(ByteBufferAccessor.instance, types, values, (byte) 0);
     }
 
     @VisibleForTesting
-    public static ByteBuffer build(List<String> types, List<ByteBuffer> values, byte lastEoc)
+    public static <V> V build(ValueAccessor<V> accessor, List<String> types, List<V> values, byte lastEoc)
     {
         assert types.size() == values.size();
 
@@ -338,30 +341,35 @@ public class DynamicCompositeType extends AbstractCompositeType
             //   1. The type data header should be the fully qualified name length in bytes.
             //   2. The length should be small enough so that it fits in 15 bits (2 bytes with the first bit zero).
             assert typeNameLength <= 0x7FFF;
-            int valueLength = values.get(i).remaining();
+            int valueLength = accessor.size(values.get(i));
             // The value length should also expect its first bit to be 0, as the length should be stored as a signed
             // 2-byte value (short).
             assert valueLength <= 0x7FFF;
             totalLength += 2 + typeNameLength + 2 + valueLength + 1;
         }
 
-        ByteBuffer result = ByteBuffer.allocate(totalLength);
+        V result = accessor.allocate(totalLength);
+        int offset = 0;
         for (int i = 0; i < numComponents; ++i)
         {
             // Write the type data (2-byte length header + the fully qualified type name in UTF-8).
             byte[] typeNameBytes = types.get(i).getBytes(StandardCharsets.UTF_8);
-            ByteBufferUtil.writeShortLength(result, typeNameBytes.length);
-            result.put(ByteBuffer.wrap(typeNameBytes));
+            accessor.putShort(result, offset, (short) typeNameBytes.length); // this should work fine also if length >= 32768
+            offset += 2;
+            accessor.copyByteArrayTo(typeNameBytes, 0, result, offset, typeNameBytes.length);
+            offset += typeNameBytes.length;
 
             // Write the type payload data (2-byte length header + the payload).
-            ByteBuffer value = values.get(i);
-            int bytesToCopy = value.remaining();
-            ByteBufferUtil.writeShortLength(result, bytesToCopy);
-            ByteBufferUtil.arrayCopy(value, value.position(), result, result.position(), bytesToCopy);
-            result.position(result.position() + bytesToCopy);
+            V value = values.get(i);
+            int bytesToCopy = accessor.size(value);
+            accessor.putShort(result, offset, (short) bytesToCopy);
+            offset += 2;
+            accessor.copyTo(value, 0, result, accessor, offset, bytesToCopy);
+            offset += bytesToCopy;
 
             // Write the end-of-component byte.
-            result.put(i != numComponents - 1 ? (byte) 0 : lastEoc);
+            accessor.putByte(result, offset, i != numComponents - 1 ? (byte) 0 : lastEoc);
+            offset += 1;
         }
         return result;
     }

@@ -52,23 +52,22 @@ public class LexicalUUIDType extends AbstractType<UUID>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer buf, ByteComparable.Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version version)
     {
-        if (buf == null || buf.remaining() == 0)
+        if (data == null || accessor.isEmpty(data))
             return null;
 
         // fixed-length (hence prefix-free) representation, but
         // we have to sign-flip the highest bytes of the two longs
-        final int bufstart = buf.position();
         return new ByteSource()
         {
             int bufpos = 0;
 
             public int next()
             {
-                if (bufpos + bufstart >= buf.limit())
+                if (bufpos >= accessor.size(data))
                     return END_OF_STREAM;
-                int v = buf.get(bufpos + bufstart) & 0xFF;
+                int v = accessor.getByte(data, bufpos) & 0xFF;
                 if (bufpos == 0 || bufpos == 8)
                     v ^= 0x80;
                 ++bufpos;
@@ -78,9 +77,9 @@ public class LexicalUUIDType extends AbstractType<UUID>
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getUuidBytes(comparableBytes, LexicalUUIDType.instance);
+        return ByteSourceUtil.getUuidBytes(accessor, comparableBytes, LexicalUUIDType.instance);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

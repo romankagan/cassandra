@@ -222,46 +222,50 @@ public class MapType<K, V> extends CollectionType<Map<K, V>>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer b, Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, Version version)
     {
-        return asComparableBytesMap(getKeysType(), getValuesType(), b, version);
+        return asComparableBytesMap(getKeysType(), getValuesType(), accessor, data, version);
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, Version version)
     {
-        return fromComparableBytesMap(comparableBytes, version, getKeysType(), getValuesType());
+        return fromComparableBytesMap(accessor, comparableBytes, version, getKeysType(), getValuesType());
     }
 
-    static ByteSource asComparableBytesMap(AbstractType<?> keysComparator, AbstractType<?> valuesComparator, ByteBuffer b, Version version)
+    static <V> ByteSource asComparableBytesMap(AbstractType<?> keysComparator,
+                                               AbstractType<?> valuesComparator,
+                                               ValueAccessor<V> accessor,
+                                               V data,
+                                               Version version)
     {
-        if (!b.hasRemaining())
+        if (accessor.isEmpty(data))
             return null;
 
-        b = b.duplicate();
         ProtocolVersion protocolVersion = ProtocolVersion.V3;
         int offset = 0;
-        int size = CollectionSerializer.readCollectionSize(b, ByteBufferAccessor.instance, protocolVersion);
+        int size = CollectionSerializer.readCollectionSize(data, accessor, protocolVersion);
         offset += CollectionSerializer.sizeOfCollectionSize(size, protocolVersion);
         ByteSource[] srcs = new ByteSource[size * 2];
         for (int i = 0; i < size; ++i)
         {
-            ByteBuffer k = CollectionSerializer.readValue(b, ByteBufferAccessor.instance, offset, protocolVersion);
-            offset += CollectionSerializer.sizeOfValue(k, ByteBufferAccessor.instance, protocolVersion);
-            srcs[i * 2 + 0] = keysComparator.asComparableBytes(k, version);
-            ByteBuffer v = CollectionSerializer.readValue(b, ByteBufferAccessor.instance, offset, protocolVersion);
-            offset += CollectionSerializer.sizeOfValue(v, ByteBufferAccessor.instance, protocolVersion);
-            srcs[i * 2 + 1] = valuesComparator.asComparableBytes(v, version);
+            V k = CollectionSerializer.readValue(data, accessor, offset, protocolVersion);
+            offset += CollectionSerializer.sizeOfValue(k, accessor, protocolVersion);
+            srcs[i * 2 + 0] = keysComparator.asComparableBytes(accessor, k, version);
+            V v = CollectionSerializer.readValue(data, accessor, offset, protocolVersion);
+            offset += CollectionSerializer.sizeOfValue(v, accessor, protocolVersion);
+            srcs[i * 2 + 1] = valuesComparator.asComparableBytes(accessor, v, version);
         }
         return ByteSource.withTerminator(version == Version.LEGACY ? 0x00 : ByteSource.TERMINATOR, srcs);
     }
 
-    static ByteBuffer fromComparableBytesMap(ByteSource.Peekable comparableBytes,
-                                             Version version,
-                                             AbstractType<?> keysComparator,
-                                             AbstractType<?> valuesComparator)
+    static <V> V fromComparableBytesMap(ValueAccessor<V> accessor,
+                                        ByteSource.Peekable comparableBytes,
+                                        Version version,
+                                        AbstractType<?> keysComparator,
+                                        AbstractType<?> valuesComparator)
     {
-        List<ByteBuffer> buffers = new ArrayList<>();
+        List<V> buffers = new ArrayList<>();
         int terminator = version == Version.LEGACY
                          ? 0x00
                          : ByteSource.TERMINATOR;
@@ -270,14 +274,14 @@ public class MapType<K, V> extends CollectionType<Map<K, V>>
         {
             buffers.add(ByteSourceUtil.nextComponentNull(separator)
                         ? null
-                        : keysComparator.fromComparableBytes(comparableBytes, version));
+                        : keysComparator.fromComparableBytes(accessor, comparableBytes, version));
             separator = comparableBytes.next();
             buffers.add(ByteSourceUtil.nextComponentNull(separator)
                         ? null
-                        : valuesComparator.fromComparableBytes(comparableBytes, version));
+                        : valuesComparator.fromComparableBytes(accessor, comparableBytes, version));
             separator = comparableBytes.next();
         }
-        return CollectionSerializer.pack(buffers, buffers.size() / 2, ProtocolVersion.V3);
+        return CollectionSerializer.pack(buffers, accessor,buffers.size() / 2, ProtocolVersion.V3);
     }
 
     @Override

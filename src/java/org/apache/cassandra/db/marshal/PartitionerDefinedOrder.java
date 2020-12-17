@@ -99,8 +99,10 @@ public class PartitionerDefinedOrder extends AbstractType<ByteBuffer>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer buf, Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, Version version)
     {
+        // Partitioners work with ByteBuffers only.
+        ByteBuffer buf = ByteBufferAccessor.instance.convert(data, accessor);
         if (version != Version.LEGACY)
         {
             // For ByteComparable.Version.OSS41 and above we encode an empty key with a null byte source. This
@@ -114,13 +116,13 @@ public class PartitionerDefinedOrder extends AbstractType<ByteBuffer>
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
         assert version != Version.LEGACY;
         if (comparableBytes == null)
-            return ByteBufferUtil.EMPTY_BYTE_BUFFER;
+            return accessor.empty();
         byte[] keyBytes = DecoratedKey.keyFromByteComparable(v -> comparableBytes, version, partitioner);
-        return ByteBuffer.wrap(keyBytes);
+        return accessor.valueOf(keyBytes);
     }
 
     @Override

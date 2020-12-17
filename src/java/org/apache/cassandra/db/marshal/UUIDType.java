@@ -108,13 +108,12 @@ public class UUIDType extends AbstractType<UUID>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer b, ByteComparable.Version v)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version v)
     {
-        if (!b.hasRemaining())
+        if (accessor.isEmpty(data))
             return null;
 
-        int s = b.position();
-        long msb = b.getLong(s);
+        long msb = accessor.getLong(data, 0);
         long version = ((msb >>> 12) & 0xf);
         ByteBuffer swizzled = ByteBuffer.allocate(16);
 
@@ -123,16 +122,16 @@ public class UUIDType extends AbstractType<UUID>
         else
             swizzled.putLong(0, (version << 60) | ((msb >>> 4) & 0x0FFFFFFFFFFFF000L) | (msb & 0xFFFL));
 
-        swizzled.putLong(8, b.getLong(s + 8));
+        swizzled.putLong(8, accessor.getLong(data, 8));
 
         // fixed-length thus prefix-free
         return ByteSource.fixedLength(swizzled);
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getUuidBytes(comparableBytes, UUIDType.instance);
+        return ByteSourceUtil.getUuidBytes(accessor, comparableBytes, UUIDType.instance);
     }
 
     @Override

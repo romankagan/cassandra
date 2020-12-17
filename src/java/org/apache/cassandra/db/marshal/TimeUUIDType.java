@@ -77,25 +77,24 @@ public class TimeUUIDType extends TemporalType<UUID>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer b, ByteComparable.Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version version)
     {
-        if (!b.hasRemaining())
+        if (accessor.isEmpty(data))
             return null;
 
-        int s = b.position();
-        long msb = b.getLong(s);
+        long msb = accessor.getLong(data, 0);
         assert ((msb >>> 12) & 0xf) == 1;
         ByteBuffer swizzled = ByteBuffer.allocate(16);
         swizzled.putLong(0, TimeUUIDType.reorderTimestampBytes(msb));
-        swizzled.putLong(8, b.getLong(s + 8) ^ 0x8080808080808080L);
+        swizzled.putLong(8, accessor.getLong(data, 8) ^ 0x8080808080808080L);
 
         return ByteSource.fixedLength(swizzled);
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getUuidBytes(comparableBytes, TimeUUIDType.instance);
+        return ByteSourceUtil.getUuidBytes(accessor, comparableBytes, TimeUUIDType.instance);
     }
 
     // takes as input 8 signed bytes in native machine order

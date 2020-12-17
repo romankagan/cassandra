@@ -203,41 +203,44 @@ public class ListType<T> extends CollectionType<List<T>>
     }
 
     @Override
-    public ByteSource asComparableBytes(ByteBuffer b, Version version)
+    public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, Version version)
     {
-        return asComparableBytesListOrSet(getElementsType(), b, version);
+        return asComparableBytesListOrSet(getElementsType(), accessor, data, version);
     }
 
     @Override
-    public ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, Version version)
+    public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, Version version)
     {
-        return fromComparableBytesListOrSet(comparableBytes, version, getElementsType());
+        return fromComparableBytesListOrSet(accessor, comparableBytes, version, getElementsType());
     }
 
-    static ByteSource asComparableBytesListOrSet(AbstractType<?> elementsComparator, ByteBuffer b, Version version)
+    static <V> ByteSource asComparableBytesListOrSet(AbstractType<?> elementsComparator,
+                                                     ValueAccessor<V> accessor,
+                                                     V data,
+                                                     Version version)
     {
-        if (!b.hasRemaining())
+        if (accessor.isEmpty(data))
             return null;
 
-        b = b.duplicate();
         int offset = 0;
-        int size = CollectionSerializer.readCollectionSize(b, ByteBufferAccessor.instance, ProtocolVersion.V3);
+        int size = CollectionSerializer.readCollectionSize(data, accessor, ProtocolVersion.V3);
         offset += CollectionSerializer.sizeOfCollectionSize(size, ProtocolVersion.V3);
         ByteSource[] srcs = new ByteSource[size];
         for (int i = 0; i < size; ++i)
         {
-            ByteBuffer v = CollectionSerializer.readValue(b, ByteBufferAccessor.instance, offset, ProtocolVersion.V3);
-            offset += CollectionSerializer.sizeOfValue(v, ByteBufferAccessor.instance, ProtocolVersion.V3);
-            srcs[i] = elementsComparator.asComparableBytes(v, version);
+            V v = CollectionSerializer.readValue(data, accessor, offset, ProtocolVersion.V3);
+            offset += CollectionSerializer.sizeOfValue(v, accessor, ProtocolVersion.V3);
+            srcs[i] = elementsComparator.asComparableBytes(accessor, v, version);
         }
         return ByteSource.withTerminator(version == Version.LEGACY ? 0x00 : ByteSource.TERMINATOR, srcs);
     }
 
-    static ByteBuffer fromComparableBytesListOrSet(ByteSource.Peekable comparableBytes,
-                                                   Version version,
-                                                   AbstractType<?> elementType)
+    static <V> V fromComparableBytesListOrSet(ValueAccessor<V> accessor,
+                                              ByteSource.Peekable comparableBytes,
+                                              Version version,
+                                              AbstractType<?> elementType)
     {
-        List<ByteBuffer> buffers = new ArrayList<>();
+        List<V> buffers = new ArrayList<>();
         int terminator = version == Version.LEGACY
                          ? 0x00
                          : ByteSource.TERMINATOR;
@@ -245,12 +248,12 @@ public class ListType<T> extends CollectionType<List<T>>
         while (separator != terminator)
         {
             if (!ByteSourceUtil.nextComponentNull(separator))
-                buffers.add(elementType.fromComparableBytes(comparableBytes, version));
+                buffers.add(elementType.fromComparableBytes(accessor, comparableBytes, version));
             else
                 buffers.add(null);
             separator = comparableBytes.next();
         }
-        return CollectionSerializer.pack(buffers, buffers.size(), ProtocolVersion.V3);
+        return CollectionSerializer.pack(buffers, accessor, buffers.size(), ProtocolVersion.V3);
     }
 
     @Override
