@@ -17,39 +17,29 @@
  */
 package org.apache.cassandra.utils.bytecomparable;
 
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.UUID;
 
-import org.apache.cassandra.db.marshal.AbstractType;
-import org.apache.cassandra.db.marshal.LexicalUUIDType;
-import org.apache.cassandra.db.marshal.TimeUUIDType;
-import org.apache.cassandra.db.marshal.UUIDType;
 import org.apache.cassandra.db.marshal.ValueAccessor;
 
 /**
- * Contains various utilities for working with {@link ByteSource}s.
+ * Contains inverse transformation utilities for {@link ByteSource}s.
+ *
+ * See ByteComparable.md for details about the encoding scheme.
  */
-public final class ByteSourceUtil
+public final class ByteSourceInverse
 {
     private static final int INITIAL_BUFFER_CAPACITY = 32;
 
-    private static final int SIGN_MASK = 0b10000000;
-
-    private static long getSignedFixedLengthAsLong(ByteSource byteSource, int length)
+    public static long getUnsignedFixedLengthAsLong(ByteSource byteSource, int length)
     {
         if (byteSource == null)
             throw new IllegalArgumentException("Unexpected null ByteSource");
         if (length < 1 || length > 8)
             throw new IllegalArgumentException("Between 1 and 8 bytes can be read at a time");
 
-        // If the decoded value is negative, pad the preceding buffer bytes with 1s, so that in case the value uses
-        // less than 8 bytes, the buffer value as long is also a correct representation of the decoded value (as an
-        // integral type using less than 8 bytes). This padding can be done by just widening the sign-corrected byte
-        // value to long.
-        long result = (byte) (byteSource.next() ^ SIGN_MASK);
-        for (int i = 1; i < length; ++i)
+        long result = 0;
+        for (int i = 0; i < length; ++i)
         {
             int data = byteSource.next();
             if (data == ByteSource.END_OF_STREAM)
@@ -68,9 +58,8 @@ public final class ByteSourceUtil
         if (length < 1)
             throw new IllegalArgumentException("At least 1 byte should be read");
 
-        // Maybe consider passing down allocation strategy (on-heap vs direct)?
         V result = accessor.allocate(length);
-        accessor.putByte(result, 0, (byte) (byteSource.next() ^ SIGN_MASK));
+        accessor.putByte(result, 0, (byte) (byteSource.next() ^ 0x80));
         for (int i = 1; i < length; ++i)
         {
             int data = byteSource.next();
@@ -95,7 +84,6 @@ public final class ByteSourceUtil
         if (length < 1)
             throw new IllegalArgumentException("At least 1 byte should be read");
 
-        // Maybe consider passing down allocation strategy (on-heap vs direct)?
         V result = accessor.allocate(length);
         int first = byteSource.next() & 0xFF;
         int xor = 0;
@@ -105,7 +93,7 @@ public final class ByteSourceUtil
             first ^= xor;
         }
         else
-            first ^= SIGN_MASK;
+            first ^= 0x80;
         accessor.putByte(result, 0, (byte) first);
 
         for (int i = 1; i < length; ++i)
@@ -133,7 +121,6 @@ public final class ByteSourceUtil
         if (length < 1)
             throw new IllegalArgumentException("At least 1 byte should be read");
 
-        // Maybe consider passing down allocation strategy (on-heap vs direct)?
         V result = accessor.allocate(length);
         for (int i = 0; i < length; ++i)
         {
@@ -168,9 +155,9 @@ public final class ByteSourceUtil
      *
      * @param byteSource A non-null byte source, containing at least 4 bytes.
      */
-    public static int getInt(ByteSource byteSource)
+    public static int getSignedInt(ByteSource byteSource)
     {
-        return (int) getSignedFixedLengthAsLong(byteSource, 4);
+        return (int) getUnsignedFixedLengthAsLong(byteSource, 4) ^ (1<<31);
     }
 
     /**
@@ -189,9 +176,9 @@ public final class ByteSourceUtil
      *
      * @param byteSource A non-null byte source, containing at least 8 bytes.
      */
-    public static long getLong(ByteSource byteSource)
+    public static long getSignedLong(ByteSource byteSource)
     {
-        return getSignedFixedLengthAsLong(byteSource, 8);
+        return getUnsignedFixedLengthAsLong(byteSource, 8) ^ (1L << 63);
     }
 
     /**
@@ -199,7 +186,7 @@ public final class ByteSourceUtil
      *
      * @param byteSource A non-null byte source, containing at least 1 byte.
      */
-    public static byte getByte(ByteSource byteSource)
+    public static byte getSignedByte(ByteSource byteSource)
     {
         if (byteSource == null)
             throw new IllegalArgumentException("Unexpected null ByteSource");
@@ -212,92 +199,21 @@ public final class ByteSourceUtil
 
     /**
      * Converts the given {@link ByteSource} to a {@code short}. All terms and conditions valid for
-     * {@link #getInt(ByteSource)} and {@link #getLong(ByteSource)} translate to this as well.
+     * {@link #getSignedInt(ByteSource)} and {@link #getSignedLong(ByteSource)} translate to this as well.
      *
      * @param byteSource A non-null byte source, containing at least 2 bytes.
      *
-     * @see #getInt(ByteSource)
-     * @see #getLong(ByteSource)
+     * @see #getSignedInt(ByteSource)
+     * @see #getSignedLong(ByteSource)
      */
-    public static short getShort(ByteSource byteSource)
+    public static short getSignedShort(ByteSource byteSource)
     {
-        return (short) getSignedFixedLengthAsLong(byteSource, 2);
+        return (short) (getUnsignedFixedLengthAsLong(byteSource, 2) ^ (1 << 15));
     }
 
     /**
-     * Extract the bytes of a UUID from the given {@link ByteSource}. If the given source doesn't represent a variant 2
-     * (Leach-Salz) {@link UUID}, anything from a wide variety of throwables may be thrown ({@link AssertionError},
-     * {@link IndexOutOfBoundsException}, {@link IllegalStateException}, etc.).
-     *
-     * @param byteSource The source we're interested in.
-     * @param uuidType The abstract UUID type with which the UUID value have been encoded.
-     * @return the bytes of the {@link UUID} corresponding to the given source.
-     *
-     * @see UUID
-     */
-    public static <V> V getUuidBytes(ValueAccessor<V> accessor, ByteSource byteSource, AbstractType<UUID> uuidType)
-    {
-        // Optional-style encoding of empty values as null sources
-        if (byteSource == null)
-            return accessor.empty();
-
-        long hiBits = getLong(byteSource);
-        long loBits = getLong(byteSource);
-
-        if (uuidType instanceof LexicalUUIDType)
-        {
-            // Lexical UUIDs are stored as just two longs (with their sign bits flipped). The simple decoding of these
-            // longs flips their sign bit back, so they can directly be used for constructing the original UUID.
-            return makeUuidBytes(accessor, hiBits, loBits);
-        }
-
-        assert uuidType instanceof UUIDType || uuidType instanceof TimeUUIDType;
-
-        // The non-lexical UUID bits are stored as an unsigned fixed-length 128-bit integer, which we can easily
-        // consume as two consecutive longs, but we need to account for the sign correction that happens (in this case
-        // unnecessarily) when we decode signed fixed-length longs.
-        hiBits ^= 1L << 63;
-        loBits ^= 1L << 63;
-
-        long version = hiBits >>> 60 & 0xF;
-        if (version == 1)
-        {
-            // If the version bits are set to 1, this is a time-based UUID, and its high bits are significantly more
-            // shuffled than in other UUIDs - if [X] represents a 16-bit tuple, [1][2][3][4] should become [3][4][2][1].
-            // See the UUID Javadoc (and more specifically the high bits layout of a Leach-Salz UUID) to understand the
-            // reasoning behind this bit twiddling in the first place (in the context of comparisons).
-            hiBits = hiBits << 32
-                     | hiBits >>> 16 & 0xFFFF0000L
-                     | hiBits >>> 48;
-            // In addition, TimeUUIDType also touches the low bits of the UUID (see CASSANDRA-8730 and DB-1758).
-            if (uuidType instanceof TimeUUIDType)
-                loBits ^= 0x8080808080808080L;
-        }
-        else
-        {
-            // Non-time UUIDs can be handled here solely by UUIDType (LexicalUUIDType would have been handled earlier).
-            assert uuidType instanceof UUIDType;
-            // Otherwise the only thing that's needed is to put the version bits back where they were originally.
-            hiBits = hiBits << 4 & 0xFFFFFFFFFFFF0000L
-                     | version << 12
-                     | hiBits & 0x0000000000000FFFL;
-        }
-
-        return makeUuidBytes(accessor, hiBits, loBits);
-    }
-
-    private static <V> V makeUuidBytes(ValueAccessor<V> accessor, long high, long low)
-    {
-        V buffer = accessor.allocate(16);
-        accessor.putLong(buffer, 0, high);
-        accessor.putLong(buffer, 8, low);
-        return buffer;
-    }
-
-    /**
-     * Reads a single variable-length byte sequence (blob, string, ...) encoded according to the scheme from
-     * https://docs.google.com/document/d/1X9S69gh2-qkb5DyWOFtu-DAr4tBKtzmGJP-Glr8uKL8, decoding it back to its
-     * original, unescaped form.
+     * Reads a single variable-length byte sequence (blob, string, ...) encoded according to the scheme described
+     * in ByteSource.md, decoding it back to its original, unescaped form.
      *
      * @param byteSource The source of the variable-length bytes sequence.
      * @return A byte array containing the original, unescaped bytes of the given source. Unescaped here means
@@ -309,8 +225,7 @@ public final class ByteSourceUtil
     }
 
     /**
-     * As above, but converts the result to a ByteSource. Used directly by SAI to convert from the prefix-free
-     * Memtable encoding to on-disk tries.
+     * As above, but converts the result to a ByteSource.
      */
     public static ByteSource unescape(ByteSource.Peekable byteSource)
     {
@@ -347,18 +262,11 @@ public final class ByteSourceUtil
                         byteSource.next();
                         return ESCAPE;
                     default:
-                        // An escaping ESCAPED_0_CONT won't be followed by either another ESCAPED_0_CONT, an
+                        // An ESCAPE or ESCAPED_0_CONT won't be followed by either another ESCAPED_0_CONT, an
                         // ESCAPED_0_DONE, or an END_OF_STREAM only when the byte-comparable is part of a multi-component
-                        // sequence, we have reached the end of the encoded byte-comparable, and the last value byte of
-                        // the byte-comparable is not a 0x00 byte. In this case, the 0x00 byte that lead us here is the
-                        // byte actually signifying the end of the byte-comparable, and the byte that we have last peeked
-                        // should be the final terminator/separator byte of the byte-comparable component.
-                        //
-                        // P.S. In the older DSE6 encoding which we do not decode, this can also happen if the last value
-                        // byte of the byte-comparable is a 0x00 byte. In this case, that byte should have been escaped
-                        // by an ESCAPED_0_CONT that we should have just consumed. The byte that we have last peeked then
-                        // should be another 0x00 byte - the one actually signifying the end of the byte-comparable, and
-                        // that last 0x00 byte then should be followed by the final terminator/separator byte.
+                        // sequence and we have reached the end of the encoded byte-comparable. In this case, the byte
+                        // we have just peeked is the separator or terminator byte between or at the end of components
+                        // (which by contact must be 0x10 - 0xFE, which cannot conflict with our special bytes).
                         assert next >= ByteSource.MIN_SEPARATOR && next <= ByteSource.MAX_SEPARATOR : next;
                         // Unlike above, we don't consume this byte (the sequence decoding needs it).
                         return END_OF_STREAM;

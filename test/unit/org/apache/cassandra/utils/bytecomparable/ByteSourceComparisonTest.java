@@ -18,25 +18,10 @@
 package org.apache.cassandra.utils.bytecomparable;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -44,6 +29,7 @@ import java.util.function.Supplier;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Ordering;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -56,39 +42,7 @@ import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ClusteringComparator;
 import org.apache.cassandra.db.ClusteringPrefix;
 import org.apache.cassandra.db.DecoratedKey;
-import org.apache.cassandra.db.marshal.AbstractType;
-import org.apache.cassandra.db.marshal.AsciiType;
-import org.apache.cassandra.db.marshal.BooleanType;
-import org.apache.cassandra.db.marshal.ByteBufferAccessor;
-import org.apache.cassandra.db.marshal.ByteType;
-import org.apache.cassandra.db.marshal.BytesType;
-import org.apache.cassandra.db.marshal.CollectionType;
-import org.apache.cassandra.db.marshal.CompositeType;
-import org.apache.cassandra.db.marshal.DateType;
-import org.apache.cassandra.db.marshal.DecimalType;
-import org.apache.cassandra.db.marshal.DoubleType;
-import org.apache.cassandra.db.marshal.DynamicCompositeType;
-import org.apache.cassandra.db.marshal.DynamicCompositeTypeTest;
-import org.apache.cassandra.db.marshal.EmptyType;
-import org.apache.cassandra.db.marshal.FloatType;
-import org.apache.cassandra.db.marshal.InetAddressType;
-import org.apache.cassandra.db.marshal.Int32Type;
-import org.apache.cassandra.db.marshal.IntegerType;
-import org.apache.cassandra.db.marshal.LexicalUUIDType;
-import org.apache.cassandra.db.marshal.ListType;
-import org.apache.cassandra.db.marshal.LongType;
-import org.apache.cassandra.db.marshal.MapType;
-import org.apache.cassandra.db.marshal.PartitionerDefinedOrder;
-import org.apache.cassandra.db.marshal.ReversedType;
-import org.apache.cassandra.db.marshal.SetType;
-import org.apache.cassandra.db.marshal.ShortType;
-import org.apache.cassandra.db.marshal.SimpleDateType;
-import org.apache.cassandra.db.marshal.TimeType;
-import org.apache.cassandra.db.marshal.TimeUUIDType;
-import org.apache.cassandra.db.marshal.TimestampType;
-import org.apache.cassandra.db.marshal.TupleType;
-import org.apache.cassandra.db.marshal.UTF8Type;
-import org.apache.cassandra.db.marshal.UUIDType;
+import org.apache.cassandra.db.marshal.*;
 import org.apache.cassandra.dht.ByteOrderedPartitioner;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.LocalPartitioner;
@@ -96,110 +50,19 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.MurmurHash;
-import org.apache.cassandra.utils.UUIDGen;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
 
 import static org.junit.Assert.assertEquals;
 
-public class ByteSourceTest
+/**
+ * Tests forward conversion to ByteSource/ByteComparable and that the result compares correctly.
+ */
+public class ByteSourceComparisonTest extends ByteSourceTestBase
 {
-    private final static Logger logger = LoggerFactory.getLogger(ByteSourceTest.class);
+    private final static Logger logger = LoggerFactory.getLogger(ByteSourceComparisonTest.class);
 
     @Rule
     public final ExpectedException expectedException = ExpectedException.none();
-
-    String[] testStrings = new String[] { "", "\0", "\0\0", "\001", "A\0\0B", "A\0B\0", "0", "0\0", "00", "1", "\377" };
-    Integer[] testInts = new Integer[] { null, Integer.MIN_VALUE, Integer.MIN_VALUE + 1, -256, -255, -128, -127, -1, 0, 1, 127, 128, 255, 256, Integer.MAX_VALUE - 1, Integer.MAX_VALUE };
-    Byte[] testBytes = new Byte[] { -128, -127, -1, 0, 1, 127 };
-    Short[] testShorts = new Short[] { Short.MIN_VALUE, Short.MIN_VALUE + 1, -256, -255, -128, -127, -1, 0, 1, 127, 128, 255, 256, Short.MAX_VALUE - 1, Short.MAX_VALUE };
-    Long[] testLongs = new Long[] { null, Long.MIN_VALUE, Long.MIN_VALUE + 1, Integer.MIN_VALUE - 1L, -256L, -255L, -128L, -127L, -1L, 0L, 1L, 127L, 128L, 255L, 256L, Integer.MAX_VALUE + 1L, Long.MAX_VALUE - 1, Long.MAX_VALUE };
-    Double[] testDoubles = new Double[] { null, Double.NEGATIVE_INFINITY, -Double.MAX_VALUE, -1e+200, -1e3, -1e0, -1e-3, -1e-200, -Double.MIN_VALUE, -0.0, 0.0, Double.MIN_VALUE, 1e-200, 1e-3, 1e0, 1e3, 1e+200, Double.MAX_VALUE, Double.POSITIVE_INFINITY, Double.NaN };
-    Float[] testFloats = new Float[] { null, Float.NEGATIVE_INFINITY, -Float.MAX_VALUE, -1e+30f, -1e3f, -1e0f, -1e-3f, -1e-30f, -Float.MIN_VALUE, -0.0f, 0.0f, Float.MIN_VALUE, 1e-30f, 1e-3f, 1e0f, 1e3f, 1e+30f, Float.MAX_VALUE, Float.POSITIVE_INFINITY, Float.NaN };
-    Boolean[] testBools = new Boolean[] { null, false, true };
-    UUID[] testUUIDs = new UUID[] { null, UUIDGen.getTimeUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                                    UUIDGen.getTimeUUID(123, 234), UUIDGen.getTimeUUID(123, 234), UUIDGen.getTimeUUID(123),
-                                    UUID.fromString("6ba7b811-9dad-11d1-80b4-00c04fd430c8"),
-                                    UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
-                                    UUID.fromString("e902893a-9d22-3c7e-a7b8-d6e313b71d9f"),
-                                    UUID.fromString("74738ff5-5367-5958-9aee-98fffdcd1876"),
-                                    UUID.fromString("52df1bb0-6a2f-11e6-b6e4-a6dea7a01b67"),
-                                    UUID.fromString("52df1bb0-6a2f-11e6-362d-aff2143498ea"),
-                                    UUID.fromString("52df1bb0-6a2f-11e6-b62d-aff2143498ea")};
-    // Instant.MIN/MAX fail Date.from.
-    Date[] testDates = new Date[] { null,
-                                    Date.from(Instant.ofEpochSecond(Integer.MIN_VALUE)),
-                                    Date.from(Instant.ofEpochSecond(Short.MIN_VALUE)),
-                                    Date.from(Instant.ofEpochMilli(-2000)),
-                                    Date.from(Instant.EPOCH),
-                                    Date.from(Instant.ofEpochMilli(2000)),
-                                    Date.from(Instant.ofEpochSecond(Integer.MAX_VALUE)),
-                                    Date.from(Instant.now()) };
-    BigInteger[] testBigInts;
-
-    {
-        Set<BigInteger> bigs = new TreeSet<>();
-        for (Long l : testLongs)
-            if (l != null)
-                bigs.add(BigInteger.valueOf(l));
-        for (int i = 0; i < 11; ++i)
-        {
-            bigs.add(BigInteger.valueOf(i));
-            bigs.add(BigInteger.valueOf(-i));
-
-            bigs.add(BigInteger.valueOf((1L << 4 * i) - 1));
-            bigs.add(BigInteger.valueOf((1L << 4 * i)));
-            bigs.add(BigInteger.valueOf(-(1L << 4 * i) - 1));
-            bigs.add(BigInteger.valueOf(-(1L << 4 * i)));
-            String p = exp10(i);
-            bigs.add(new BigInteger(p));
-            bigs.add(new BigInteger("-" + p));
-            p = exp10(1 << i);
-            bigs.add(new BigInteger(p));
-            bigs.add(new BigInteger("-" + p));
-
-            BigInteger base = BigInteger.ONE.shiftLeft(512 * i);
-            bigs.add(base);
-            bigs.add(base.add(BigInteger.ONE));
-            bigs.add(base.subtract(BigInteger.ONE));
-            base = base.negate();
-            bigs.add(base);
-            bigs.add(base.add(BigInteger.ONE));
-            bigs.add(base.subtract(BigInteger.ONE));
-        }
-        testBigInts = bigs.toArray(new BigInteger[0]);
-    }
-    BigDecimal[] testBigDecimals;
-    {
-        String vals = "0, 1, 1.1, 21, 98.9, 99, 99.9, 100, 100.1, 101, 331, 0.4, 0.07, 0.0700, 0.005, " +
-                      "6e4, 7e200, 6e-300, 8.1e2000, 8.1e-2000, 9e2000000000, " +
-                      "123456789012.34567890e-1000000000, 123456.78901234, 1234.56789012e2, " +
-                      "1.0000, 0.01e2, 100e-2, 00, 0.000, 0E-18, 0E+18";
-        List<BigDecimal> decs = new ArrayList<>();
-        for (String s : vals.split(", "))
-        {
-            decs.add(new BigDecimal(s));
-            decs.add(new BigDecimal("-" + s));
-        }
-        testBigDecimals = decs.toArray(new BigDecimal[0]);
-    }
-
-    static String exp10(int pow)
-    {
-        StringBuilder builder = new StringBuilder();
-        builder.append('1');
-        for (int i=0; i<pow; ++i)
-            builder.append('0');
-        return builder.toString();
-    }
-
-    Object[][] testValues = new Object[][] { testStrings, testInts, testBools, testDoubles, testBigInts, testBigDecimals };
-    AbstractType[] testTypes = new AbstractType[] {
-                               AsciiType.instance,
-                               Int32Type.instance,
-                               BooleanType.instance,
-                               DoubleType.instance,
-                               IntegerType.instance,
-                               DecimalType.instance };
 
     @Test
     public void testStringsAscii()
@@ -211,6 +74,7 @@ public class ByteSourceTest
     public void testStringsUTF8()
     {
         testType(UTF8Type.instance, testStrings);
+        testDirect(x -> ByteSource.of(x, Version.OSS41), Ordering.<String>natural()::compare, testStrings);
     }
 
     @Test
@@ -374,15 +238,6 @@ public class ByteSourceTest
     @Test
     public void testInetAddressType() throws UnknownHostException
     {
-        InetAddress[] testInets = new InetAddress[] { null,
-                                                      InetAddress.getLocalHost(),
-                                                      InetAddress.getLoopbackAddress(),
-                                                      InetAddress.getByName("192.168.0.1"),
-                                                      InetAddress.getByName("fe80::428d:5cff:fe53:1dc9"),
-                                                      InetAddress.getByName("2001:610:3:200a:192:87:36:2"),
-                                                      InetAddress.getByName("10.0.0.1"),
-                                                      InetAddress.getByName("0a00:0001::"),
-                                                      InetAddress.getByName("::10.0.0.1") };
         testType(InetAddressType.instance, testInets);
     }
 
@@ -428,12 +283,6 @@ public class ByteSourceTest
                                                                                             v -> testType.decompose(v)));
         }
     }
-
-    ClusteringPrefix.Kind[] kinds = new ClusteringPrefix.Kind[] {
-    	ClusteringPrefix.Kind.INCL_START_BOUND,
-    	ClusteringPrefix.Kind.CLUSTERING,
-    	ClusteringPrefix.Kind.EXCL_START_BOUND,
-    };
 
     interface PairTester
     {
@@ -519,14 +368,14 @@ public class ByteSourceTest
     @Test
     public void testTupleTypeNonFull()
     {
-        TupleType tt = new TupleType(ImmutableList.of(AsciiType.instance, Int32Type.instance));
+        TupleType tt = new TupleType(ImmutableList.of(UTF8Type.instance, Int32Type.instance));
         List<ByteBuffer> tests = ImmutableList.of
             (
-            TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeAndRandomPad(AsciiType.instance, ""),
+            TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeAndRandomPad(UTF8Type.instance, ""),
                                                                                 decomposeAndRandomPad(Int32Type.instance, 0)}),
-            TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeAndRandomPad(AsciiType.instance, ""),
+            TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeAndRandomPad(UTF8Type.instance, ""),
                                                                                 decomposeAndRandomPad(Int32Type.instance, null)}),
-            TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeAndRandomPad(AsciiType.instance, "")}),
+            TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeAndRandomPad(UTF8Type.instance, "")}),
             TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[0])
             );
         testBuffers(tt, tests);
@@ -537,7 +386,7 @@ public class ByteSourceTest
         TupleType tt = new TupleType(ImmutableList.of(t1, t2));
         ByteBuffer b1 = TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {t1.decompose(o1), t2.decompose(o2)});
         ByteBuffer b2 = TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {t1.decompose(o3), t2.decompose(o4)});
-        assertComparesSame(tt, b1, b2);
+        assertComparesSameBuffers(tt, b1, b2);
     }
 
     @Test
@@ -550,14 +399,14 @@ public class ByteSourceTest
     @Test
     public void testCompositeTypeNonFull()
     {
-        CompositeType tt = CompositeType.getInstance(AsciiType.instance, Int32Type.instance);
+        CompositeType tt = CompositeType.getInstance(UTF8Type.instance, Int32Type.instance);
         List<ByteBuffer> tests = ImmutableList.of
             (
-            CompositeType.build(ByteBufferAccessor.instance, decomposeAndRandomPad(AsciiType.instance, ""), decomposeAndRandomPad(Int32Type.instance, 0)),
-            CompositeType.build(ByteBufferAccessor.instance, decomposeAndRandomPad(AsciiType.instance, ""), decomposeAndRandomPad(Int32Type.instance, null)),
-            CompositeType.build(ByteBufferAccessor.instance, decomposeAndRandomPad(AsciiType.instance, "")),
+            CompositeType.build(ByteBufferAccessor.instance, decomposeAndRandomPad(UTF8Type.instance, ""), decomposeAndRandomPad(Int32Type.instance, 0)),
+            CompositeType.build(ByteBufferAccessor.instance, decomposeAndRandomPad(UTF8Type.instance, ""), decomposeAndRandomPad(Int32Type.instance, null)),
+            CompositeType.build(ByteBufferAccessor.instance, decomposeAndRandomPad(UTF8Type.instance, "")),
             CompositeType.build(ByteBufferAccessor.instance),
-            CompositeType.build(ByteBufferAccessor.instance, true, decomposeAndRandomPad(AsciiType.instance, "")),
+            CompositeType.build(ByteBufferAccessor.instance, true, decomposeAndRandomPad(UTF8Type.instance, "")),
             CompositeType.build(ByteBufferAccessor.instance,true)
             );
         for (ByteBuffer b : tests)
@@ -570,7 +419,7 @@ public class ByteSourceTest
         CompositeType tt = CompositeType.getInstance(t1, t2);
         ByteBuffer b1 = CompositeType.build(ByteBufferAccessor.instance, decomposeAndRandomPad(t1, o1), decomposeAndRandomPad(t2, o2));
         ByteBuffer b2 = CompositeType.build(ByteBufferAccessor.instance, decomposeAndRandomPad(t1, o3), decomposeAndRandomPad(t2, o4));
-        assertComparesSame(tt, b1, b2);
+        assertComparesSameBuffers(tt, b1, b2);
     }
 
     @Test
@@ -594,7 +443,7 @@ public class ByteSourceTest
     @Test
     public void testListTypeString()
     {
-        testCollection(ListType.getInstance(AsciiType.instance, true), testStrings, () -> new ArrayList<>(), new Random());
+        testCollection(ListType.getInstance(UTF8Type.instance, true), testStrings, () -> new ArrayList<>(), new Random());
     }
 
     @Test
@@ -606,7 +455,7 @@ public class ByteSourceTest
     @Test
     public void testSetTypeString()
     {
-        testCollection(SetType.getInstance(AsciiType.instance, true), testStrings, () -> new HashSet<>(), new Random());
+        testCollection(SetType.getInstance(UTF8Type.instance, true), testStrings, () -> new HashSet<>(), new Random());
     }
 
     @Test
@@ -635,13 +484,13 @@ public class ByteSourceTest
     @Test
     public void testMapTypeStringLong()
     {
-        testMap(MapType.getInstance(AsciiType.instance, LongType.instance, true), testStrings, testLongs, () -> new HashMap<>(), new Random());
+        testMap(MapType.getInstance(UTF8Type.instance, LongType.instance, true), testStrings, testLongs, () -> new HashMap<>(), new Random());
     }
 
     @Test
     public void testMapTypeStringLongTree()
     {
-        testMap(MapType.getInstance(AsciiType.instance, LongType.instance, true), testStrings, testLongs, () -> new TreeMap<>(), new Random());
+        testMap(MapType.getInstance(UTF8Type.instance, LongType.instance, true), testStrings, testLongs, () -> new TreeMap<>(), new Random());
     }
 
     @Test
@@ -875,12 +724,11 @@ public class ByteSourceTest
     {
         try
         {
-            for (Object i : values) {
-                ByteBuffer b = decomposeAndRandomPad(type, i);
+            for (ByteBuffer b : values) {
                 logger.info("Value {} bytes {} ByteSource {}",
-                                  safeStr(type.getSerializer().toCQLLiteral(b)),
-                                  safeStr(ByteBufferUtil.bytesToHex(b)),
-                                  typeToComparable(type, b).byteComparableAsString(Version.OSS41));
+                            safeStr(type.getSerializer().toCQLLiteral(b)),
+                            safeStr(ByteBufferUtil.bytesToHex(b)),
+                            typeToComparable(type, b).byteComparableAsString(Version.OSS41));
             }
         }
         catch (UnsupportedOperationException e)

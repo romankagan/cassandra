@@ -33,7 +33,7 @@ import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 
 /**
  * This is the old version of TimestampType, but has been replaced as it wasn't comparing pre-epoch timestamps
@@ -63,7 +63,7 @@ public class DateType extends AbstractType<Date>
     @Override
     public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getOptionalFixedLength(accessor, comparableBytes, 8);
+        return ByteSourceInverse.getOptionalFixedLength(accessor, comparableBytes, 8);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

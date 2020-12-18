@@ -27,7 +27,7 @@ import org.apache.cassandra.dht.Token.KeyBound;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 import org.apache.cassandra.utils.IFilter.FilterKey;
 import org.apache.cassandra.utils.MurmurHash;
 
@@ -168,9 +168,9 @@ public abstract class DecoratedKey implements PartitionPosition, FilterKey
     {
         ByteSource.Peekable peekable = byteComparable.asPeekableBytes(version);
         // Decode the token from the first component of the multi-component sequence representing the whole decorated key.
-        Token token = partitioner.getTokenFactory().fromComparableBytes(ByteSourceUtil.nextComponentSource(peekable), version);
+        Token token = partitioner.getTokenFactory().fromComparableBytes(ByteSourceInverse.nextComponentSource(peekable), version);
         // Decode the key bytes from the second component.
-        byte[] keyBytes = ByteSourceUtil.getUnescapedBytes(ByteSourceUtil.nextComponentSource(peekable));
+        byte[] keyBytes = ByteSourceInverse.getUnescapedBytes(ByteSourceInverse.nextComponentSource(peekable));
         // Instantiate a decorated key from the decoded token and key bytes, using the provided factory method.
         return decoratedKeyFactory.apply(token, keyBytes);
     }
@@ -181,8 +181,8 @@ public abstract class DecoratedKey implements PartitionPosition, FilterKey
     {
         ByteSource.Peekable peekable = byteComparable.asPeekableBytes(version);
         // Decode the token from the first component of the multi-component sequence representing the whole decorated key.
-        Token token = partitioner.getTokenFactory().fromComparableBytes(ByteSourceUtil.nextComponentSource(peekable), version);
+        Token token = partitioner.getTokenFactory().fromComparableBytes(ByteSourceInverse.nextComponentSource(peekable), version);
         // Decode the key bytes from the second component.
-        return ByteSourceUtil.getUnescapedBytes(ByteSourceUtil.nextComponentSource(peekable));
+        return ByteSourceInverse.getUnescapedBytes(ByteSourceInverse.nextComponentSource(peekable));
     }
 }

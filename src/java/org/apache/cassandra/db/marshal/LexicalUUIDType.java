@@ -28,7 +28,7 @@ import org.apache.cassandra.serializers.UUIDSerializer;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 
 public class LexicalUUIDType extends AbstractType<UUID>
 {
@@ -79,7 +79,16 @@ public class LexicalUUIDType extends AbstractType<UUID>
     @Override
     public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getUuidBytes(accessor, comparableBytes, LexicalUUIDType.instance);
+        // Optional-style encoding of empty values as null sources
+        if (comparableBytes == null)
+            return accessor.empty();
+
+        long hiBits = ByteSourceInverse.getSignedLong(comparableBytes);
+        long loBits = ByteSourceInverse.getSignedLong(comparableBytes);
+
+        // Lexical UUIDs are stored as just two signed longs. The decoding of these longs flips their sign bit back, so
+        // they can directly be used for constructing the original UUID.
+        return UUIDType.makeUuidBytes(accessor, hiBits, loBits);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

@@ -35,7 +35,7 @@ import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 import org.apache.cassandra.utils.MurmurHash;
 import org.apache.cassandra.utils.ObjectSizes;
 
@@ -327,7 +327,7 @@ public class Murmur3Partitioner implements IPartitioner
     {
         public Token fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
         {
-            long tokenData = ByteSourceUtil.getLong(comparableBytes);
+            long tokenData = ByteSourceInverse.getSignedLong(comparableBytes);
             return new LongToken(tokenData);
         }
 

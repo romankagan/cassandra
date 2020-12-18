@@ -324,11 +324,11 @@ public class ClusteringComparator implements Comparator<Clusterable>
         }
     }
 
-    public <V> Clustering<V> clusteringFromOrderedBytes(ValueAccessor<V> accessor,
-                                                        ByteSource.Peekable orderedBytes,
-                                                        ByteComparable.Version version)
+    public <V> Clustering<V> clusteringFromByteComparable(ValueAccessor<V> accessor,
+                                                          ByteComparable comparable)
     {
-        assert version == ByteComparable.Version.LEGACY;
+        ByteComparable.Version version = ByteComparable.Version.OSS41;
+        ByteSource.Peekable orderedBytes = ByteSource.peekable(comparable.asComparableBytes(version));
         if (orderedBytes == null)
             return null;
 
@@ -353,7 +353,7 @@ public class ClusteringComparator implements Comparator<Clusterable>
             {
             case NEXT_COMPONENT_NULL:
             case NEXT_COMPONENT_NULL_REVERSED:
-                components[cc] = null;
+                components[cc] = accessor.empty();
                 break;
             case NEXT_COMPONENT:
                 components[cc] = subtype(cc).fromComparableBytes(accessor, orderedBytes, version);
@@ -371,11 +371,12 @@ public class ClusteringComparator implements Comparator<Clusterable>
         }
     }
 
-    public <V> ClusteringBound<V> boundFromOrderedBytes(ValueAccessor<V> accessor,
-                                                        ByteSource.Peekable orderedBytes,
-                                                        ByteComparable.Version version, boolean isEnd)
+    public <V> ClusteringBound<V> boundFromByteComparable(ValueAccessor<V> accessor,
+                                                          ByteComparable comparable,
+                                                          boolean isEnd)
     {
-        assert version == ByteComparable.Version.LEGACY;
+        ByteComparable.Version version = ByteComparable.Version.OSS41;
+        ByteSource.Peekable orderedBytes = ByteSource.peekable(comparable.asComparableBytes(version));
         if (orderedBytes == null)
             return null;
 
@@ -390,16 +391,18 @@ public class ClusteringComparator implements Comparator<Clusterable>
             {
             case NEXT_COMPONENT_NULL:
             case NEXT_COMPONENT_NULL_REVERSED:
-                components[cc] = null;
+                components[cc] = accessor.empty();
                 break;
             case NEXT_COMPONENT:
                 components[cc] = subtype(cc).fromComparableBytes(accessor, orderedBytes, version);
                 break;
             case ByteSource.LT_NEXT_COMPONENT:
-                return accessor.factory().bound(isEnd ? ClusteringPrefix.Kind.EXCL_END_BOUND : ClusteringPrefix.Kind.INCL_START_BOUND,
+                return accessor.factory().bound(isEnd ? ClusteringPrefix.Kind.EXCL_END_BOUND
+                                                      : ClusteringPrefix.Kind.INCL_START_BOUND,
                                                 Arrays.copyOf(components, cc));
             case ByteSource.GT_NEXT_COMPONENT:
-                return accessor.factory().bound(isEnd ? ClusteringPrefix.Kind.INCL_END_BOUND : ClusteringPrefix.Kind.EXCL_START_BOUND,
+                return accessor.factory().bound(isEnd ? ClusteringPrefix.Kind.INCL_END_BOUND
+                                                      : ClusteringPrefix.Kind.EXCL_START_BOUND,
                                                 Arrays.copyOf(components, cc));
             default:
                 throw new AssertionError("Unexpected separator " + Integer.toHexString(sep) + " in ClusteringBound encoding");
@@ -409,11 +412,11 @@ public class ClusteringComparator implements Comparator<Clusterable>
         }
     }
 
-    public <V> ClusteringBoundary<V> boundaryFromOrderedBytes(ValueAccessor<V> accessor,
-                                                              ByteSource.Peekable orderedBytes,
-                                                              ByteComparable.Version version)
+    public <V> ClusteringBoundary<V> boundaryFromByteComparable(ValueAccessor<V> accessor,
+                                                                ByteComparable comparable)
     {
-        assert version == ByteComparable.Version.LEGACY;
+        ByteComparable.Version version = ByteComparable.Version.OSS41;
+        ByteSource.Peekable orderedBytes = ByteSource.peekable(comparable.asComparableBytes(version));
         if (orderedBytes == null)
             return null;
 
@@ -428,7 +431,7 @@ public class ClusteringComparator implements Comparator<Clusterable>
             {
             case NEXT_COMPONENT_NULL:
             case NEXT_COMPONENT_NULL_REVERSED:
-                components[cc] = null;
+                components[cc] = accessor.empty();
                 break;
             case NEXT_COMPONENT:
                 components[cc] = subtype(cc).fromComparableBytes(accessor, orderedBytes, version);

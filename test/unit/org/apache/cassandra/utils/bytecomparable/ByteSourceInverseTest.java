@@ -36,7 +36,7 @@ import java.util.stream.*;
 import com.google.common.collect.ImmutableList;
 
 @RunWith(Parameterized.class)
-public class ByteSourceUtilTest
+public class ByteSourceInverseTest
 {
     private static final String ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()";
 
@@ -48,18 +48,18 @@ public class ByteSourceUtilTest
 
     private final ByteComparable.Version version;
 
-    public ByteSourceUtilTest(ByteComparable.Version version)
+    public ByteSourceInverseTest(ByteComparable.Version version)
     {
         this.version = version;
     }
 
     @Test
-    public void testGetInt()
+    public void testGetSignedInt()
     {
         IntConsumer intConsumer = initial ->
         {
             ByteSource byteSource = ByteSource.of(initial);
-            int decoded = ByteSourceUtil.getInt(byteSource);
+            int decoded = ByteSourceInverse.getSignedInt(byteSource);
             Assert.assertEquals(initial, decoded);
         };
 
@@ -82,13 +82,13 @@ public class ByteSourceUtilTest
         long l1 = Integer.toUnsignedLong(hi) << 32 | Integer.toUnsignedLong(lo);
 
         ByteSource byteSource = ByteSource.of(l1);
-        int i1 = ByteSourceUtil.getInt(byteSource);
-        int i2 = ByteSourceUtil.getInt(byteSource);
+        int i1 = ByteSourceInverse.getSignedInt(byteSource);
+        int i2 = ByteSourceInverse.getSignedInt(byteSource);
         Assert.assertEquals(i1 + 1, i2);
 
         try
         {
-            ByteSourceUtil.getInt(byteSource);
+            ByteSourceInverse.getSignedInt(byteSource);
             Assert.fail();
         }
         catch (IllegalArgumentException e)
@@ -97,19 +97,19 @@ public class ByteSourceUtilTest
         }
 
         byteSource = ByteSource.of(l1);
-        int iFirst = ByteSourceUtil.getInt(byteSource);
+        int iFirst = ByteSourceInverse.getSignedInt(byteSource);
         Assert.assertEquals(i1, iFirst);
-        int iNext = ByteSourceUtil.getInt(byteSource);
+        int iNext = ByteSourceInverse.getSignedInt(byteSource);
         Assert.assertEquals(i2, iNext);
     }
 
     @Test
-    public void testGetLong()
+    public void testGetSignedLong()
     {
         LongConsumer longConsumer = initial ->
         {
             ByteSource byteSource = ByteSource.of(initial);
-            long decoded = ByteSourceUtil.getLong(byteSource);
+            long decoded = ByteSourceInverse.getSignedLong(byteSource);
             Assert.assertEquals(initial, decoded);
         };
 
@@ -122,14 +122,14 @@ public class ByteSourceUtilTest
     }
 
     @Test
-    public void testGetByte()
+    public void testGetSignedByte()
     {
         Consumer<Byte> byteConsumer = boxedByte ->
         {
             byte initial = boxedByte;
             ByteBuffer byteBuffer = ByteType.instance.decompose(initial);
             ByteSource byteSource = ByteType.instance.asComparableBytes(byteBuffer, version);
-            byte decoded = ByteSourceUtil.getByte(byteSource);
+            byte decoded = ByteSourceInverse.getSignedByte(byteSource);
             Assert.assertEquals(initial, decoded);
         };
 
@@ -138,14 +138,14 @@ public class ByteSourceUtilTest
     }
 
     @Test
-    public void testGetShort()
+    public void testGetSignedShort()
     {
         Consumer<Short> shortConsumer = boxedShort ->
         {
             short initial = boxedShort;
             ByteBuffer shortBuffer = ShortType.instance.decompose(initial);
             ByteSource byteSource = ShortType.instance.asComparableBytes(shortBuffer, version);
-            short decoded = ByteSourceUtil.getShort(byteSource);
+            short decoded = ByteSourceInverse.getSignedShort(byteSource);
             Assert.assertEquals(initial, decoded);
         };
 
@@ -156,19 +156,19 @@ public class ByteSourceUtilTest
     @Test
     public void testBadByteSourceForFixedLengthNumbers()
     {
-        Stream.of("getInt",
-                  "getLong",
-                  "getByte",
-                  "getShort")
+        Stream.of("getSignedInt",
+                  "getSignedLong",
+                  "getSignedByte",
+                  "getSignedShort")
               .map(methodName ->
                    {
                        try
                        {
-                           return ByteSourceUtil.class.getMethod(methodName, ByteSource.class);
+                           return ByteSourceInverse.class.getMethod(methodName, ByteSource.class);
                        }
                        catch (NoSuchMethodException e)
                        {
-                           Assert.fail("Expected ByteSourceUtil to have method called " + methodName
+                           Assert.fail("Expected ByteSourceInverse to have method called " + methodName
                                                + " with a single parameter of type ByteSource");
                        }
                        return null;
@@ -179,7 +179,7 @@ public class ByteSourceUtilTest
                            {
                                try
                                {
-                                   fixedLengthNumberMethod.invoke(ByteSourceUtil.class, badSource);
+                                   fixedLengthNumberMethod.invoke(ByteSourceInverse.class, badSource);
                                    Assert.fail("Expected IllegalArgumentException not thrown");
                                }
                                catch (Throwable maybe)
@@ -193,49 +193,12 @@ public class ByteSourceUtilTest
     }
 
     @Test
-    public void testGetUuid()
-    {
-        Consumer<UUID> uuidConsumer = initial ->
-        {
-            ByteBuffer uuidBuffer = UUIDType.instance.decompose(initial);
-            ByteSource byteSource = UUIDType.instance.asComparableBytes(uuidBuffer, version);
-            UUID decoded = UUIDType.instance.compose(ByteSourceUtil.getUuidBytes(ByteBufferAccessor.instance, byteSource, UUIDType.instance));
-            Assert.assertEquals(initial, decoded);
-
-            uuidBuffer = LexicalUUIDType.instance.decompose(initial);
-            byteSource = LexicalUUIDType.instance.asComparableBytes(uuidBuffer, version);
-            decoded = LexicalUUIDType.instance.compose(ByteSourceUtil.getUuidBytes(ByteBufferAccessor.instance, byteSource, LexicalUUIDType.instance));
-            Assert.assertEquals(initial, decoded);
-
-            if (initial == null || initial.version() == 1)
-            {
-                uuidBuffer = TimeUUIDType.instance.decompose(initial);
-                byteSource = TimeUUIDType.instance.asComparableBytes(uuidBuffer, version);
-                decoded = TimeUUIDType.instance.compose(ByteSourceUtil.getUuidBytes(ByteBufferAccessor.instance, byteSource, TimeUUIDType.instance));
-                Assert.assertEquals(initial, decoded);
-            }
-        };
-
-        uuidConsumer.accept(null);
-        new Random().longs(1000)
-                    .forEach(seed ->
-                             {
-                                 UUID timeUuid = UUIDGen.getTimeUUID();
-                                 uuidConsumer.accept(timeUuid);
-                                 UUID randomTimeUuid = UUIDGen.getRandomTimeUUIDFromMicros(seed);
-                                 uuidConsumer.accept(randomTimeUuid);
-                                 UUID randomUuid = UUID.randomUUID();
-                                 uuidConsumer.accept(randomUuid);
-                             });
-    }
-
-    @Test
     public void testGetString()
     {
         Consumer<String> stringConsumer = initial ->
         {
             ByteSource.Peekable byteSource = initial == null ? null : ByteSource.peekable(ByteSource.of(initial, version));
-            String decoded = ByteSourceUtil.getString(byteSource);
+            String decoded = ByteSourceInverse.getString(byteSource);
             Assert.assertEquals(initial, decoded);
         };
 
@@ -266,7 +229,7 @@ public class ByteSourceUtilTest
         Consumer<ByteBuffer> byteBufferConsumer = initial ->
         {
             ByteSource.Peekable byteSource = ByteSource.peekable(ByteSource.of(initial, version));
-            byte[] decodedBytes = ByteSourceUtil.getUnescapedBytes(byteSource);
+            byte[] decodedBytes = ByteSourceInverse.getUnescapedBytes(byteSource);
             byte[] initialBytes = ByteBufferUtil.getArray(initial);
             Assert.assertTrue(Arrays.equals(initialBytes, decodedBytes));
         };
@@ -347,7 +310,7 @@ public class ByteSourceUtilTest
             Function<Object, ByteSource> generator = generatorPerType.get(type);
             ByteSource originalSource = generator.apply(value);
             ByteSource originalSourceCopy = generator.apply(value);
-            byte[] bytes = ByteSourceUtil.readBytes(originalSource);
+            byte[] bytes = ByteSourceInverse.readBytes(originalSource);
             // The best way to test the read bytes seems to be to assert that just directly using them as a
             // ByteSource (using ByteSource.fixedLength(byte[])) they compare as equal to another ByteSource obtained
             // from the same original value.

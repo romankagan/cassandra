@@ -116,7 +116,7 @@ public class AbstractTypeByteSourceTest
         // Assert that fromComparableBytes decodes correctly.
         ByteSource.Peekable peekableBytes = ByteSource.peekable(type.asComparableBytes(initialBuffer, version));
         ByteBuffer decodedBuffer = type.fromComparableBytes(peekableBytes, version);
-        Assert.assertEquals("For " + ByteSourceTest.safeStr(initial),
+        Assert.assertEquals("For " + ByteSourceComparisonTest.safeStr(initial),
                             ByteBufferUtil.bytesToHex(initialBuffer),
                             ByteBufferUtil.bytesToHex(decodedBuffer));
         // Assert that the value composed from fromComparableBytes is the correct one.

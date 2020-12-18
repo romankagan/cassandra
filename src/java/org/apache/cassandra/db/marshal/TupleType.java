@@ -34,10 +34,9 @@ import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.exceptions.SyntaxException;
 import org.apache.cassandra.serializers.*;
 import org.apache.cassandra.transport.ProtocolVersion;
-import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 
 import static com.google.common.collect.Iterables.any;
 import static com.google.common.collect.Iterables.transform;
@@ -206,6 +205,9 @@ public class TupleType extends AbstractType<ByteBuffer>
     @Override
     public <V> ByteSource asComparableBytes(ValueAccessor<V> accessor, V data, ByteComparable.Version version)
     {
+        if (accessor.isEmpty(data))
+            return null;
+
         V[] bufs = split(accessor, data);  // this may be shorter than types.size -- other srcs remain null in that case
         ByteSource[] srcs = new ByteSource[types.size()];
         for (int i = 0; i < bufs.length; ++i)
@@ -219,11 +221,14 @@ public class TupleType extends AbstractType<ByteBuffer>
     @Override
     public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
+        if (comparableBytes == null)
+            return accessor.empty();
+
         V[] componentBuffers = accessor.createArray(types.size());
         for (int i = 0; i < types.size(); ++i)
         {
             AbstractType<?> componentType = types.get(i);
-            ByteSource.Peekable component = ByteSourceUtil.nextComponentSource(comparableBytes);
+            ByteSource.Peekable component = ByteSourceInverse.nextComponentSource(comparableBytes);
             componentBuffers[i] = componentType.fromComparableBytes(accessor, component, version);
         }
         return buildValue(accessor, componentBuffers);

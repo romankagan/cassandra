@@ -30,7 +30,7 @@ import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 
 public class Int32Type extends NumberType<Integer>
 {
@@ -67,7 +67,7 @@ public class Int32Type extends NumberType<Integer>
     @Override
     public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getOptionalSignedFixedLength(accessor, comparableBytes, 4);
+        return ByteSourceInverse.getOptionalSignedFixedLength(accessor, comparableBytes, 4);
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

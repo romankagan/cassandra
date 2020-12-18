@@ -32,7 +32,7 @@ import org.apache.cassandra.serializers.UUIDSerializer;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 import org.apache.cassandra.utils.UUIDGen;
 
 /**
@@ -101,9 +101,8 @@ public class UUIDType extends AbstractType<UUID>
 
         // Amusingly (or not so much), although UUIDType freely takes time UUIDs (UUIDs with version 1), it compares
         // them differently than TimeUUIDType. This is evident in the least significant bytes comparison (the code
-        // below for UUIDType), where UUIDType flips only the leading bit of the leading byte, where TimeUUIDType flips
-        // the leading bits of all the other bytes (the so-called native machine order). See CASSANDRA-8730 for details
-        // around this discrepancy.
+        // below for UUIDType), where UUIDType treats them as unsigned bytes, while TimeUUIDType compares the bytes
+        // signed. See CASSANDRA-8730 for details around this discrepancy.
         return UnsignedLongs.compare(accessorL.getLong(left, 8), accessorR.getLong(right, 8));
     }
 
@@ -131,7 +130,38 @@ public class UUIDType extends AbstractType<UUID>
     @Override
     public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getUuidBytes(accessor, comparableBytes, UUIDType.instance);
+        // Optional-style encoding of empty values as null sources
+        if (comparableBytes == null)
+            return accessor.empty();
+
+        // The UUID bits are stored as an unsigned fixed-length 128-bit integer.
+        long hiBits = ByteSourceInverse.getUnsignedFixedLengthAsLong(comparableBytes, 8);
+        long loBits = ByteSourceInverse.getUnsignedFixedLengthAsLong(comparableBytes, 8);
+
+        long version1 = hiBits >>> 60 & 0xF;
+        if (version1 == 1)
+        {
+            // If the version bits are set to 1, this is a time-based UUID, and its high bits are significantly more
+            // shuffled than in other UUIDs. Revert the shuffle.
+            hiBits = TimeUUIDType.reorderBackTimestampBytes(hiBits);
+        }
+        else
+        {
+            // For non-time UUIDs, the only thing that's needed is to put the version bits back where they were originally.
+            hiBits = hiBits << 4 & 0xFFFFFFFFFFFF0000L
+                     | version1 << 12
+                     | hiBits & 0x0000000000000FFFL;
+        }
+
+        return makeUuidBytes(accessor, hiBits, loBits);
+    }
+
+    static <V> V makeUuidBytes(ValueAccessor<V> accessor, long high, long low)
+    {
+        V buffer = accessor.allocate(16);
+        accessor.putLong(buffer, 0, high);
+        accessor.putLong(buffer, 8, low);
+        return buffer;
     }
 
     @Override

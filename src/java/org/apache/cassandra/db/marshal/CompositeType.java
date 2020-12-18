@@ -34,7 +34,7 @@ import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 
 import static com.google.common.collect.Iterables.any;
 import static com.google.common.collect.Iterables.transform;
@@ -224,7 +224,7 @@ public class CompositeType extends AbstractCompositeType
             return accessor.empty();
 
         int separator = comparableBytes.next();
-        boolean isStatic = ByteSourceUtil.nextComponentNull(separator);
+        boolean isStatic = ByteSourceInverse.nextComponentNull(separator);
         int i = 0;
         V[] buffers = accessor.createArray(types.size());
         byte lastEoc = 0;
@@ -238,11 +238,11 @@ public class CompositeType extends AbstractCompositeType
             // Get the next type and decode its payload.
             AbstractType<?> type = types.get(i);
             V decoded = type.fromComparableBytes(accessor,
-                                                 ByteSourceUtil.nextComponentSource(comparableBytes, separator),
+                                                 ByteSourceInverse.nextComponentSource(comparableBytes, separator),
                                                  version);
             buffers[i++] = decoded;
 
-            lastEoc = ByteSourceUtil.getByte(ByteSourceUtil.nextComponentSource(comparableBytes));
+            lastEoc = ByteSourceInverse.getSignedByte(ByteSourceInverse.nextComponentSource(comparableBytes));
         }
         return build(accessor, isStatic, Arrays.copyOf(buffers, i), lastEoc);
     }

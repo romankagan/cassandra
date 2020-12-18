@@ -35,7 +35,7 @@ import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.ObjectSizes;
 import org.apache.cassandra.utils.Pair;
@@ -133,7 +133,7 @@ public class OrderPreservingPartitioner implements IPartitioner
     {
         public Token fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)
         {
-            return new StringToken(ByteSourceUtil.getString(comparableBytes));
+            return new StringToken(ByteSourceInverse.getString(comparableBytes));
         }
 
         public ByteBuffer toByteArray(Token token)

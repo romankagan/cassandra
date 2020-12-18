@@ -38,7 +38,7 @@ import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 
 public class ListType<T> extends CollectionType<List<T>>
 {
@@ -240,6 +240,9 @@ public class ListType<T> extends CollectionType<List<T>>
                                               Version version,
                                               AbstractType<?> elementType)
     {
+        if (comparableBytes == null)
+            return accessor.empty();
+
         List<V> buffers = new ArrayList<>();
         int terminator = version == Version.LEGACY
                          ? 0x00
@@ -247,7 +250,7 @@ public class ListType<T> extends CollectionType<List<T>>
         int separator = comparableBytes.next();
         while (separator != terminator)
         {
-            if (!ByteSourceUtil.nextComponentNull(separator))
+            if (!ByteSourceInverse.nextComponentNull(separator))
                 buffers.add(elementType.fromComparableBytes(accessor, comparableBytes, version));
             else
                 buffers.add(null);

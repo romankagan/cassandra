@@ -33,7 +33,7 @@ import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 import org.apache.cassandra.utils.Pair;
 
 public class MapType<K, V> extends CollectionType<Map<K, V>>
@@ -265,6 +265,9 @@ public class MapType<K, V> extends CollectionType<Map<K, V>>
                                         AbstractType<?> keysComparator,
                                         AbstractType<?> valuesComparator)
     {
+        if (comparableBytes == null)
+            return accessor.empty();
+
         List<V> buffers = new ArrayList<>();
         int terminator = version == Version.LEGACY
                          ? 0x00
@@ -272,11 +275,11 @@ public class MapType<K, V> extends CollectionType<Map<K, V>>
         int separator = comparableBytes.next();
         while (separator != terminator)
         {
-            buffers.add(ByteSourceUtil.nextComponentNull(separator)
+            buffers.add(ByteSourceInverse.nextComponentNull(separator)
                         ? null
                         : keysComparator.fromComparableBytes(accessor, comparableBytes, version));
             separator = comparableBytes.next();
-            buffers.add(ByteSourceUtil.nextComponentNull(separator)
+            buffers.add(ByteSourceInverse.nextComponentNull(separator)
                         ? null
                         : valuesComparator.fromComparableBytes(accessor, comparableBytes, version));
             separator = comparableBytes.next();

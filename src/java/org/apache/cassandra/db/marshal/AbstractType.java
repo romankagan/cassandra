@@ -41,7 +41,7 @@ import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 import org.github.jamm.Unmetered;
 
 import static org.apache.cassandra.db.marshal.AbstractType.ComparisonType.CUSTOM;
@@ -632,9 +632,11 @@ public abstract class AbstractType<T> implements Comparator<ByteBuffer>, Assignm
     {
         if (isByteOrderComparable)
         {
-            // For BYTE_ORDER, asComparableBytes() never create a null source, so we shouldn't get one when decoding
-            assert comparableBytes != null;
-            return accessor.valueOf(ByteSourceUtil.getUnescapedBytes(comparableBytes));
+            // For BYTE_ORDER, asComparableBytes() will never create a null source, but we may get a null from TupleType
+            if (comparableBytes != null)
+                return accessor.valueOf(ByteSourceInverse.getUnescapedBytes(comparableBytes));
+            else
+                return accessor.empty();
         }
         else
         {

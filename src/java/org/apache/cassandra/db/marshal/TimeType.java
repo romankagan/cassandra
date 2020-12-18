@@ -31,7 +31,7 @@ import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable.Version;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
-import org.apache.cassandra.utils.bytecomparable.ByteSourceUtil;
+import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 
 /**
  * Nanosecond resolution time values
@@ -57,7 +57,7 @@ public class TimeType extends TemporalType<Long>
     @Override
     public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
-        return ByteSourceUtil.getOptionalFixedLength(accessor, comparableBytes, 8);
+        return ByteSourceInverse.getOptionalFixedLength(accessor, comparableBytes, 8);
     }
 
     @Override

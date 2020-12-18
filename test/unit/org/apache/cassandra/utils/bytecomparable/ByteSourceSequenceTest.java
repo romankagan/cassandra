@@ -84,25 +84,25 @@ public class ByteSourceSequenceTest
                 null, ByteSource.of("b", version), ByteSource.of("c", version)
         ));
         expectNextComponentNull(comparableBytes);
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getString, "b");
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getString, "c");
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getString, "b");
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getString, "c");
         assertEquals(ByteSource.TERMINATOR, comparableBytes.next());
 
         comparableBytes = ByteSource.peekable(ByteSource.withTerminator(
                 ByteSource.TERMINATOR,
                 ByteSource.of("a", version), null, ByteSource.of("c", version)
         ));
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getString, "a");
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getString, "a");
         expectNextComponentNull(comparableBytes);
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getString, "c");
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getString, "c");
         assertEquals(ByteSource.TERMINATOR, comparableBytes.next());
 
         comparableBytes = ByteSource.peekable(ByteSource.withTerminator(
                 ByteSource.TERMINATOR,
                 ByteSource.of("a", version), ByteSource.of("b", version), null
         ));
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getString, "a");
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getString, "b");
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getString, "a");
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getString, "b");
         expectNextComponentNull(comparableBytes);
         assertEquals(ByteSource.TERMINATOR, comparableBytes.next());
 
@@ -110,7 +110,7 @@ public class ByteSourceSequenceTest
                 ByteSource.TERMINATOR,
                 ByteSource.of("a", version), null, null
         ));
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getString, "a");
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getString, "a");
         expectNextComponentNull(comparableBytes);
         expectNextComponentNull(comparableBytes);
         assertEquals(ByteSource.TERMINATOR, comparableBytes.next());
@@ -121,14 +121,14 @@ public class ByteSourceSequenceTest
         ));
         expectNextComponentNull(comparableBytes);
         expectNextComponentNull(comparableBytes);
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getString, "c");
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getString, "c");
         assertEquals(ByteSource.TERMINATOR, comparableBytes.next());
     }
 
     private static void expectNextComponentNull(ByteSource.Peekable comparableBytes)
     {
         // We expect null-signifying separator, followed by a null ByteSource component
-        ByteSource.Peekable next = ByteSourceUtil.nextComponentSource(comparableBytes);
+        ByteSource.Peekable next = ByteSourceInverse.nextComponentSource(comparableBytes);
         assertNull(next);
     }
 
@@ -137,7 +137,7 @@ public class ByteSourceSequenceTest
                                                      T expected)
     {
         // We expect a regular separator, followed by a ByteSource component corresponding to the expected value
-        ByteSource.Peekable next = ByteSourceUtil.nextComponentSource(comparableBytes);
+        ByteSource.Peekable next = ByteSourceInverse.nextComponentSource(comparableBytes);
         assertNotNull(next);
         T decoded = decoder.apply(next);
         assertEquals(expected, decoded);
@@ -153,7 +153,7 @@ public class ByteSourceSequenceTest
                 null, ByteSource.of(intValue), varintToByteSource(varintValue)
         ));
         expectNextComponentNull(comparableBytes);
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getInt, intValue);
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getSignedInt, intValue);
         expectNextComponentValue(comparableBytes, VARINT, varintValue);
         assertEquals(ByteSource.TERMINATOR, comparableBytes.next());
 
@@ -161,7 +161,7 @@ public class ByteSourceSequenceTest
                 ByteSource.TERMINATOR,
                 ByteSource.of(intValue), null, varintToByteSource(varintValue)
         ));
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getInt, intValue);
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getSignedInt, intValue);
         expectNextComponentNull(comparableBytes);
         expectNextComponentValue(comparableBytes, VARINT, varintValue);
         assertEquals(ByteSource.TERMINATOR, comparableBytes.next());
@@ -170,7 +170,7 @@ public class ByteSourceSequenceTest
                 ByteSource.TERMINATOR,
                 ByteSource.of(intValue), varintToByteSource(varintValue), null
         ));
-        expectNextComponentValue(comparableBytes, ByteSourceUtil::getInt, intValue);
+        expectNextComponentValue(comparableBytes, ByteSourceInverse::getSignedInt, intValue);
         expectNextComponentValue(comparableBytes, VARINT, varintValue);
         expectNextComponentNull(comparableBytes);
         assertEquals(ByteSource.TERMINATOR, comparableBytes.next());
@@ -253,7 +253,7 @@ public class ByteSourceSequenceTest
                     ByteSource.TERMINATOR,
                     ByteSource.of(randomString, version), byteSource, varintToByteSource(randomVarint)
             ));
-            expectNextComponentValue(sequence, ByteSourceUtil::getString, randomString);
+            expectNextComponentValue(sequence, ByteSourceInverse::getString, randomString);
             expectNextComponentValue(sequence, type, value);
             expectNextComponentValue(sequence, VARINT, randomVarint);
             assertEquals(ByteSource.TERMINATOR, sequence.next());
@@ -263,7 +263,7 @@ public class ByteSourceSequenceTest
                     ByteSource.TERMINATOR,
                     ByteSource.of(randomString, version), byteSource, varintToByteSource(randomVarint)
             ));
-            expectNextComponentValue(sequence, ByteSourceUtil::getString, randomString);
+            expectNextComponentValue(sequence, ByteSourceInverse::getString, randomString);
             expectNextComponentNull(sequence);
             expectNextComponentValue(sequence, VARINT, randomVarint);
             assertEquals(ByteSource.TERMINATOR, sequence.next());
@@ -426,7 +426,7 @@ public class ByteSourceSequenceTest
                                               T expected)
     {
         // We expect a regular separator, followed by a ByteSource component corresponding to the expected value
-        ByteSource.Peekable next = ByteSourceUtil.nextComponentSource(comparableBytes);
+        ByteSource.Peekable next = ByteSourceInverse.nextComponentSource(comparableBytes);
         T decoded = type.compose(type.fromComparableBytes(next, version));
         assertEquals(expected, decoded);
     }
@@ -436,7 +436,7 @@ public class ByteSourceSequenceTest
                                           ByteBuffer expected)
     {
         // We expect a regular separator, followed by a ByteSource component corresponding to the expected value
-        ByteSource.Peekable next = ByteSourceUtil.nextComponentSource(comparableBytes);
+        ByteSource.Peekable next = ByteSourceInverse.nextComponentSource(comparableBytes);
         assertEquals(expected, type.fromComparableBytes(next, version));
     }
 
@@ -469,7 +469,7 @@ public class ByteSourceSequenceTest
             ClusteringPrefix prefix = BufferClusteringBound.create(prefixKind, clusteringKeyValues);
             ByteSource.Peekable comparableBytes = COMP.asByteComparable(prefix).asPeekableBytes(version);
             assertEquals(ByteSource.NEXT_COMPONENT, comparableBytes.next());
-            ByteSourceUtil.getString(comparableBytes);
+            ByteSourceInverse.getString(comparableBytes);
             assertEquals(ByteSource.NEXT_COMPONENT, comparableBytes.next());
             DECIMAL.fromComparableBytes(comparableBytes, version);
             assertEquals(ByteSource.NEXT_COMPONENT, comparableBytes.next());
@@ -482,7 +482,7 @@ public class ByteSourceSequenceTest
             prefix = BufferClusteringBound.create(prefixKind, nullValueBeforeTerminator);
             comparableBytes = COMP.asByteComparable(prefix).asPeekableBytes(version);
             assertEquals(ByteSource.NEXT_COMPONENT, comparableBytes.next());
-            ByteSourceUtil.getString(comparableBytes);
+            ByteSourceInverse.getString(comparableBytes);
             assertEquals(ByteSource.NEXT_COMPONENT, comparableBytes.next());
             DECIMAL.fromComparableBytes(comparableBytes, version);
             // Expect null-signifying separator here.
@@ -499,7 +499,7 @@ public class ByteSourceSequenceTest
             // have known/computable length, which is why we've named it so...
             comparableBytes = COMP_REVERSED_KNOWN_LENGTH.asByteComparable(prefix).asPeekableBytes(version);
             assertEquals(ByteSource.NEXT_COMPONENT, comparableBytes.next());
-            ByteSourceUtil.getString(comparableBytes);
+            ByteSourceInverse.getString(comparableBytes);
             assertEquals(ByteSource.NEXT_COMPONENT, comparableBytes.next());
             DECIMAL.fromComparableBytes(comparableBytes, version);
             // Expect reversed null-signifying separator here.
