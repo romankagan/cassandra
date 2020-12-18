@@ -55,7 +55,7 @@ are in the releavant `AbstractType` subclass.
 ### Desired properties
 
 Generally, we desire the following two properties from the byte-ordered translations of values we use in the database:
-1) Comparison equivalence:  
+- Comparison equivalence (1):  
     <math xmlns="http://www.w3.org/1998/Math/MathML">
       <semantics>
         <mstyle displaystyle="true">
@@ -111,7 +111,7 @@ Generally, we desire the following two properties from the byte-ordered translat
         <!-- <annotation encoding="text/x-asciimath">forall x,y in T, "compareBytesUnsigned"(T."byteOrdered"(x), T."byteOrdered"(y))=T."compare"(x, y)</annotation> -->
       </semantics>
     </math>
-2) Prefix-freedom:  
+- Prefix-freedom (2):  
     <math xmlns="http://www.w3.org/1998/Math/MathML">
       <semantics>
         <mstyle displaystyle="true">
@@ -156,7 +156,8 @@ The former is the essential requirement, and the latter allows construction of e
 values, as well as a little more efficiency in the data structures.
 
 To more efficiently encode byte-ordered blobs, however, we use a slightly tweaked version of the above requirements:
-3) Comparison equivalence:  
+
+- Comparison equivalence (3):  
     <math xmlns="http://www.w3.org/1998/Math/MathML">
       <semantics>
         <mstyle displaystyle="true">
@@ -243,7 +244,7 @@ To more efficiently encode byte-ordered blobs, however, we use a slightly tweake
     "compareBytesUnsigned"(T."byteOrdered"(x)+b_1, T."byteOrdered"(y)+b_2)=T."compare"(x, y)</annotation> -->
       </semantics>
     </math>
-4) Weak prefix-freedom:  
+- Weak prefix-freedom (4):  
     <math xmlns="http://www.w3.org/1998/Math/MathML">
       <semantics>
         <mstyle displaystyle="true">
@@ -304,13 +305,13 @@ To more efficiently encode byte-ordered blobs, however, we use a slightly tweake
     </math>
 
 These versions allow the addition of a separator byte after each value, and guarantee that the combination with 
-separator fulfills the original requirements. 3) is somewhat stronger than 1) but is necessarily true if 2) is also in
-force, while 4) trivially follows from 2).
+separator fulfills the original requirements. (3) is somewhat stronger than (1) but is necessarily true if (2) is also 
+in force, while (4) trivially follows from (2).
 
 ## Fixed length unsigned integers (Murmur token, date/time)
 
 This is the trivial case, as we can simply use the input bytes in big-endian order. The comparison result is the same, 
-and fixed length values are trivially prefix free, i.e. 1) and 2) are satisfied, and thus 3) and 4) follow from the
+and fixed length values are trivially prefix free, i.e. (1) and (2) are satisfied, and thus (3) and (4) follow from the
 observation above.
 
 ## Fixed-length signed integers (byte, short, int, bigint)
@@ -399,9 +400,9 @@ Since:
   separator
 - the sequence has a fixed number of components or we use a different trailing value whenever it can be shorter
 
-the properties 3) and 4) guarantee that the byte comparison of the encoding goes in the same direction as the
-lexicographical comparison of the sequence. In combination with the third point above, 4) also ensures that no encoding 
-is a prefix of another. Since we have 1) and 2), 3) and 4) are also satisfied.
+the properties (3) and (4) guarantee that the byte comparison of the encoding goes in the same direction as the
+lexicographical comparison of the sequence. In combination with the third point above, (4) also ensures that no encoding 
+is a prefix of another. Since we have (1) and (2), (3) and (4) are also satisfied.
 
 Note that this means that the encodings of all partition and clustering keys used in the database will be prefix-free.
 
@@ -432,8 +433,8 @@ Examples:
 | ≤ (blob 22 00 00)   |        40·22 00 FE FE·60
 
 Within the encoding, a `00` byte can only be followed by a `FE` or `FF` byte, and hence if an encoding is a prefix of 
-another, the latter has to have a `FE` or `FF` as the next byte, which ensures both 4) (adding `10`-`EF` to the former 
-makes it no longer a prefix of the latter) and 3) (adding `10`-`EF` to the former makes it smaller than the latter; in
+another, the latter has to have a `FE` or `FF` as the next byte, which ensures both (4) (adding `10`-`EF` to the former 
+makes it no longer a prefix of the latter) and (3) (adding `10`-`EF` to the former makes it smaller than the latter; in
 this case the original value of the former is a prefix of the original value of the latter).
 
 ## Variable-length integers (varint, RandomPartitioner token)
@@ -458,7 +459,7 @@ This translates to the following encoding of varints:
 
 Since when comparing two numbers we either have a difference in the length prefix, or the lengths are the same if we 
 need to compare the content bytes, there is no risk that a longer number can be confused with a shorter combined in a
-multi-component sequence. In other words, no value can be a prefix of another, thus we have 1) and 2) and thus 3) and 4)
+multi-component sequence. In other words, no value can be a prefix of another, thus we have (1) and (2) and thus (3) and (4)
 as well.
 
 Examples:
@@ -558,13 +559,13 @@ Examples:
 (mexp stands for “modulated exponent”, i.e. exponent * sign)
 
 The values are prefix-free, because no exponent’s encoding can be a prefix of another, and the mantissas can never have
-a `00` byte at any place other than the last byte, and thus all 1)-4) are satisfied.
+a `00` byte at any place other than the last byte, and thus all (1)-(4) are satisfied.
 
 ## Reversed types
 
 Reversing a type is straightforward: flip all bits of the encoded byte sequence. Since the source type encoding must
-satisfy 3) and 4), the flipped bits also do for the reversed comparator. (It is also true that if the source type 
-satisfies 1)-2), the reversed will satisfy these too.)
+satisfy (3) and (4), the flipped bits also do for the reversed comparator. (It is also true that if the source type 
+satisfies (1)-(2), the reversed will satisfy these too.)
 
 In a sequence we also must correct the `null` encoding for a reversed type (since it must be greater than all values).
 Instead of `0x3F` we use `0x41` as the separator byte.
