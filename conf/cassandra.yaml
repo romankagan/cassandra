@@ -20,7 +20,10 @@ cluster_name: 'Test Cluster'
 # Specifying initial_token will override this setting on the node's initial start,
 # on subsequent starts, this setting will apply even if initial token is set.
 #
-num_tokens: 256
+# See https://cassandra.apache.org/doc/latest/getting_started/production.html#tokens for
+# best practice information about num_tokens.
+#
+num_tokens: 16
 
 # Triggers automatic allocation of num_tokens tokens for this node. The allocation
 # algorithm attempts to choose tokens in a way that optimizes replicated load over
@@ -37,7 +40,7 @@ num_tokens: 256
 
 # Replica factor is explicitly set, regardless of keyspace or datacenter.
 # This is the replica factor within the datacenter, like NTS.
-# allocate_tokens_for_local_replication_factor: 3
+allocate_tokens_for_local_replication_factor: 3
 
 # initial_token allows you to specify tokens manually.  While you can use it with
 # vnodes (num_tokens > 1, above) -- in which case you should provide a 
@@ -921,6 +924,10 @@ request_timeout_in_ms: 10000
 # which picks up the OS default and configure the net.ipv4.tcp_retries2 sysctl to be ~8.
 # internode_tcp_user_timeout_in_ms = 30000
 
+# The amount of time unacknowledged data is allowed on a streaming connection.
+# The default is 5 minutes. Increase it or set it to 0 in order to increase the timeout.
+# internode_streaming_tcp_user_timeout_in_ms = 300000
+
 # The maximum continuous period a connection may be unwritable in application space
 # internode_application_timeout_in_ms = 30000
 
@@ -1399,6 +1406,12 @@ repaired_data_tracking_for_partition_reads_enabled: false
 # mismatches will also be recorded. This is to avoid potential signal:noise issues are unconfirmed
 # mismatches are less actionable than confirmed ones.
 report_unconfirmed_repaired_data_mismatches: false
+
+# Having many tables and/or keyspaces negatively affects performance of many operations in the
+# cluster. When the number of tables/keyspaces in the cluster exceeds the following thresholds
+# a client warning will be sent back to the user when creating a table or keyspace.
+# table_count_warn_threshold: 150
+# keyspace_count_warn_threshold: 40
 
 #########################
 # EXPERIMENTAL FEATURES #

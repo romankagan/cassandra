@@ -27,7 +27,7 @@
     <property name="debuglevel" value="source,lines,vars"/>
 
     <!-- default version and SCM information -->
-    <property name="base.version" value="4.0-beta4"/>
+    <property name="base.version" value="4.0-beta5"/>
     <property name="scm.connection" value="scm:https://gitbox.apache.org/repos/asf/cassandra.git"/>
     <property name="scm.developerConnection" value="scm:https://gitbox.apache.org/repos/asf/cassandra.git"/>
     <property name="scm.url" value="https://gitbox.apache.org/repos/asf?p=cassandra.git;a=tree"/>
@@ -590,9 +590,9 @@
           <dependency groupId="org.yaml" artifactId="snakeyaml" version="1.26"/>
           <dependency groupId="junit" artifactId="junit" version="4.12" />
           <dependency groupId="org.mockito" artifactId="mockito-core" version="3.2.4" />
-          <dependency groupId="org.quicktheories" artifactId="quicktheories" version="0.25" />
+          <dependency groupId="org.quicktheories" artifactId="quicktheories" version="0.26" />
           <dependency groupId="com.google.code.java-allocation-instrumenter" artifactId="java-allocation-instrumenter" version="${allocation-instrumenter.version}" />
-          <dependency groupId="org.apache.cassandra" artifactId="dtest-api" version="0.0.6" />
+          <dependency groupId="org.apache.cassandra" artifactId="dtest-api" version="0.0.7" />
           <dependency groupId="org.reflections" artifactId="reflections" version="0.9.12" />
           <dependency groupId="org.apache.rat" artifactId="apache-rat" version="0.10">
              <exclusion groupId="commons-lang" artifactId="commons-lang"/>
@@ -631,8 +631,9 @@
           <dependency groupId="com.addthis.metrics" artifactId="reporter-config3" version="3.0.3" />
           <dependency groupId="org.mindrot" artifactId="jbcrypt" version="0.3m" />
           <dependency groupId="io.airlift" artifactId="airline" version="0.8" />
-          <dependency groupId="io.netty" artifactId="netty-all" version="4.1.50.Final" />
-          <dependency groupId="io.netty" artifactId="netty-tcnative-boringssl-static" version="2.0.31.Final" />
+          <dependency groupId="io.netty" artifactId="netty-bom" version="4.1.54.Final" type="pom" />
+          <dependency groupId="io.netty" artifactId="netty-all" version="4.1.54.Final" />
+          <dependency groupId="io.netty" artifactId="netty-tcnative-boringssl-static" version="2.0.34.Final" />
           <dependency groupId="net.openhft" artifactId="chronicle-queue" version="${chronicle-queue.version}"/>
           <dependency groupId="net.openhft" artifactId="chronicle-core" version="${chronicle-core.version}"/>
           <dependency groupId="net.openhft" artifactId="chronicle-bytes" version="${chronicle-bytes.version}"/>
@@ -778,6 +779,7 @@
         <dependency groupId="org.mockito" artifactId="mockito-core" />
         <dependency groupId="org.reflections" artifactId="reflections" />
         <dependency groupId="com.datastax.cassandra" artifactId="cassandra-driver-core" classifier="shaded"/>
+        <dependency groupId="io.netty" artifactId="netty-bom"  type="pom" />
         <dependency groupId="io.netty" artifactId="netty-all"/>
         <dependency groupId="org.eclipse.jdt.core.compiler" artifactId="ecj"/>
         <dependency groupId="org.caffinitas.ohc" artifactId="ohc-core"/>
@@ -866,6 +868,7 @@
         <!-- don't need jamm unless running a server in which case it needs to be a -javagent to be used anyway -->
         <dependency groupId="com.github.jbellis" artifactId="jamm"/>
 
+        <dependency groupId="io.netty" artifactId="netty-bom"  type="pom"  />
         <dependency groupId="io.netty" artifactId="netty-all"/>
         <dependency groupId="net.openhft" artifactId="chronicle-queue" version="${chronicle-queue.version}"/>
         <dependency groupId="net.openhft" artifactId="chronicle-core" version="${chronicle-core.version}"/>
@@ -887,6 +890,11 @@
         <dependency groupId="org.gridkit.lab" artifactId="jvm-attach-api" />
         <dependency groupId="com.beust" artifactId="jcommander" />
         <dependency groupId="org.gridkit.jvmtool" artifactId="sjk-json"/>
+
+        <!-- sasi deps -->
+        <dependency groupId="de.jflex" artifactId="jflex" />
+        <dependency groupId="com.github.rholder" artifactId="snowball-stemmer" />
+        <dependency groupId="com.googlecode.concurrent-trees" artifactId="concurrent-trees" />
       </artifact:pom>
     </target>
 
@@ -1204,9 +1212,9 @@
     <target name="_artifacts-init" depends="jar,javadoc,gen-doc">
       <mkdir dir="${dist.dir}"/>
       <!-- fix the control linefeed so that builds on windows works on linux -->
-      <fixcrlf srcdir="bin" includes="**/*" excludes="**/*.bat, **/*.ps1" eol="lf" eof="remove" />
-      <fixcrlf srcdir="conf" includes="**/*" excludes="**/*.bat, **/*.ps1" eol="lf" eof="remove" />
-      <fixcrlf srcdir="tools/bin" includes="**/*" excludes="**/*.bat, **/*.ps1" eol="lf" eof="remove" />
+      <fixcrlf srcdir="bin" includes="**/*" eol="lf" eof="remove" />
+      <fixcrlf srcdir="conf" includes="**/*" eol="lf" eof="remove" />
+      <fixcrlf srcdir="tools/bin" includes="**/*" eol="lf" eof="remove" />
       <copy todir="${dist.dir}/lib">
         <fileset dir="${build.lib}"/>
         <fileset dir="${build.dir}">
@@ -1307,21 +1315,17 @@
           <exclude name=".externalToolBuilders/**" />
         </tarfileset>
 
-        <!-- Shell includes and batch files in bin/ and tools/bin/ -->
+        <!-- Shell includes in bin/ and tools/bin/ -->
         <tarfileset dir="${basedir}" prefix="${final.name}-src">
           <include name="bin/*.in.sh" />
-          <include name="bin/*.bat" />
           <include name="tools/bin/*.in.sh" />
-          <include name="tools/bin/*.bat" />
         </tarfileset>
         <!-- Everything else (assumed to be scripts), is executable -->
         <tarfileset dir="${basedir}" prefix="${final.name}-src" mode="755">
           <include name="bin/*"/>
           <exclude name="bin/*.in.sh" />
-          <exclude name="bin/*.bat" />
           <include name="tools/bin/*"/>
           <exclude name="tools/bin/*.in.sh" />
-          <exclude name="tools/bin/*.bat" />
         </tarfileset>
       </tar>
 

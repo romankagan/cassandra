@@ -360,7 +360,7 @@ public class DatabaseDescriptor
 
         applyEncryptionContext();
 
-        applySslContextHotReload();
+        applySslContext();
     }
 
     private static void applySimpleConfig()
@@ -988,15 +988,17 @@ public class DatabaseDescriptor
         encryptionContext = new EncryptionContext(conf.transparent_data_encryption_options);
     }
 
-    public static void applySslContextHotReload()
+    public static void applySslContext()
     {
         try
         {
+            SSLFactory.validateSslContext("Internode messaging", conf.server_encryption_options, true, true);
+            SSLFactory.validateSslContext("Native transport", conf.client_encryption_options, conf.client_encryption_options.require_client_auth, true);
             SSLFactory.initHotReloading(conf.server_encryption_options, conf.client_encryption_options, false);
         }
-        catch(IOException e)
+        catch (IOException e)
         {
-            throw new ConfigurationException("Failed to initialize SSL hot reloading", e);
+            throw new ConfigurationException("Failed to initialize SSL", e);
         }
     }
 
@@ -2095,6 +2097,16 @@ public class DatabaseDescriptor
     public static void setInternodeTcpUserTimeoutInMS(int value)
     {
         conf.internode_tcp_user_timeout_in_ms = value;
+    }
+
+    public static int getInternodeStreamingTcpUserTimeoutInMS()
+    {
+        return conf.internode_streaming_tcp_user_timeout_in_ms;
+    }
+
+    public static void setInternodeStreamingTcpUserTimeoutInMS(int value)
+    {
+        conf.internode_streaming_tcp_user_timeout_in_ms = value;
     }
 
     public static int getInternodeMaxMessageSizeInBytes()
@@ -3259,6 +3271,26 @@ public class DatabaseDescriptor
         if (enabled != conf.auto_optimise_preview_repair_streams)
             logger.info("Changing auto_optimise_preview_repair_streams from {} to {}", conf.auto_optimise_preview_repair_streams, enabled);
         conf.auto_optimise_preview_repair_streams = enabled;
+    }
+
+    public static int tableCountWarnThreshold()
+    {
+        return conf.table_count_warn_threshold;
+    }
+
+    public static void setTableCountWarnThreshold(int value)
+    {
+        conf.table_count_warn_threshold = value;
+    }
+
+    public static int keyspaceCountWarnThreshold()
+    {
+        return conf.keyspace_count_warn_threshold;
+    }
+
+    public static void setKeyspaceCountWarnThreshold(int value)
+    {
+        conf.keyspace_count_warn_threshold = value;
     }
 
 

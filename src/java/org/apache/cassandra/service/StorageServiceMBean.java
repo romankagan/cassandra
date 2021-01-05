@@ -574,6 +574,9 @@ public interface StorageServiceMBean extends NotificationEmitter
     public void setInternodeTcpUserTimeoutInMS(int value);
     public int getInternodeTcpUserTimeoutInMS();
 
+    public void setInternodeStreamingTcpUserTimeoutInMS(int value);
+    public int getInternodeStreamingTcpUserTimeoutInMS();
+
     public void setCounterWriteRpcTimeout(long value);
     public long getCounterWriteRpcTimeout();
 
@@ -834,4 +837,9 @@ public interface StorageServiceMBean extends NotificationEmitter
     public void setAutoOptimiseFullRepairStreams(boolean enabled);
     public boolean autoOptimisePreviewRepairStreams();
     public void setAutoOptimisePreviewRepairStreams(boolean enabled);
+
+    int getTableCountWarnThreshold();
+    void setTableCountWarnThreshold(int value);
+    int getKeyspaceCountWarnThreshold();
+    void setKeyspaceCountWarnThreshold(int value);
 }

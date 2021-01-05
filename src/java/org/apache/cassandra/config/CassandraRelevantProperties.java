@@ -147,6 +147,18 @@ public enum CassandraRelevantProperties
      */
     BOOTSTRAP_SCHEMA_DELAY_MS("cassandra.schema_delay_ms"),
 
+    /**
+     * Gossip quarantine delay is used while evaluating membership changes and should only be changed with extreme care.
+     */
+    GOSSIPER_QUARANTINE_DELAY("cassandra.gossip_quarantine_delay_ms"),
+
+    /**
+     * When doing a host replacement its possible that the gossip state is "empty" meaning that the endpoint is known
+     * but the current state isn't known.  If the host replacement is needed to repair this state, this property must
+     * be true.
+     */
+    REPLACEMENT_ALLOW_EMPTY("cassandra.allow_empty_replace_address", "true"),
+
     //cassandra properties (without the "cassandra." prefix)
 
     /**
@@ -163,7 +175,10 @@ public enum CassandraRelevantProperties
     ORG_APACHE_CASSANDRA_DB_VIRTUAL_SYSTEM_PROPERTIES_TABLE_TEST("org.apache.cassandra.db.virtual.SystemPropertiesTableTest"),
 
     /** This property indicates whether disable_mbean_registration is true */
-    IS_DISABLED_MBEAN_REGISTRATION("org.apache.cassandra.disable_mbean_registration");
+    IS_DISABLED_MBEAN_REGISTRATION("org.apache.cassandra.disable_mbean_registration"),
+
+    /** what class to use for mbean registeration */
+    MBEAN_REGISTRATION_CLASS("org.apache.cassandra.mbean_registration_class");
 
     CassandraRelevantProperties(String key, String defaultVal)
     {
@@ -197,6 +212,28 @@ public enum CassandraRelevantProperties
     }
 
     /**
+     * Gets the value of a system property as a String.
+     * @return system property String value if it exists, overrideDefaultValue otherwise.
+     */
+    public String getString(String overrideDefaultValue)
+    {
+        String value = System.getProperty(key);
+        if (value == null)
+            return overrideDefaultValue;
+
+        return STRING_CONVERTER.convert(value);
+    }
+
+    /**
+     * Sets the value into system properties.
+     * @param value to set
+     */
+    public void setString(String value)
+    {
+        System.setProperty(key, value);
+    }
+
+    /**
      * Gets the value of a system property as a boolean.
      * @return system property boolean value if it exists, false otherwise().
      */
@@ -208,6 +245,28 @@ public enum CassandraRelevantProperties
     }
 
     /**
+     * Gets the value of a system property as a boolean.
+     * @return system property boolean value if it exists, overrideDefaultValue otherwise.
+     */
+    public boolean getBoolean(boolean overrideDefaultValue)
+    {
+        String value = System.getProperty(key);
+        if (value == null)
+            return overrideDefaultValue;
+
+        return BOOLEAN_CONVERTER.convert(value);
+    }
+
+    /**
+     * Sets the value into system properties.
+     * @param value to set
+     */
+    public void setBoolean(boolean value)
+    {
+        System.setProperty(key, Boolean.toString(value));
+    }
+
+    /**
      * Gets the value of a system property as a int.
      * @return system property int value if it exists, defaultValue otherwise.
      */
@@ -216,6 +275,28 @@ public enum CassandraRelevantProperties
         String value = System.getProperty(key);
 
         return INTEGER_CONVERTER.convert(value == null ? defaultVal : value);
+    }
+
+    /**
+     * Gets the value of a system property as a int.
+     * @return system property int value if it exists, overrideDefaultValue otherwise.
+     */
+    public int getInt(int overrideDefaultValue)
+    {
+        String value = System.getProperty(key);
+        if (value == null)
+            return overrideDefaultValue;
+
+        return INTEGER_CONVERTER.convert(value);
+    }
+
+    /**
+     * Sets the value into system properties.
+     * @param value to set
+     */
+    public void setInt(int value)
+    {
+        System.setProperty(key, Integer.toString(value));
     }
 
     private interface PropertyConverter<T>
