@@ -622,9 +622,11 @@ public abstract class AbstractType<T> implements Comparator<ByteBuffer>, Assignm
      * storage engine internals). If the given bytes don't correspond to the encoding of some payload value for this
      * abstract type, an {@link IllegalArgumentException} may be thrown.
      *
+     * @param accessor value accessor used to construct the value.
      * @param comparableBytes A byte-ordered representation (presumably of a payload for this abstract type).
-     * @return A {@link ByteBuffer} of a payload for this abstract type, corresponding to the given byte-ordered
-     * representation.
+     * @param version The byte-comparable version used to construct the representation.
+     * @return A of a payload for this abstract type, corresponding to the given byte-ordered representation,
+     *         constructed using the supplied value accessor.
      *
      * @see #asComparableBytes
      */

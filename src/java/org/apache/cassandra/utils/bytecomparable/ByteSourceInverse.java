@@ -31,6 +31,10 @@ public final class ByteSourceInverse
 {
     private static final int INITIAL_BUFFER_CAPACITY = 32;
 
+    /**
+     * Get the given number of bytes and produce a long from them, effectively treating the bytes as a big-endian
+     * unsigned encoding of the number.
+     */
     public static long getUnsignedFixedLengthAsLong(ByteSource byteSource, int length)
     {
         if (byteSource == null)
@@ -51,6 +55,10 @@ public final class ByteSourceInverse
         return result;
     }
 
+    /**
+     * Produce the bytes for an encoded signed fixed-length number.
+     * The first byte has its sign bit inverted, and the rest are passed unchanged.
+     */
     public static <V> V getSignedFixedLength(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
         if (byteSource == null)
@@ -59,7 +67,9 @@ public final class ByteSourceInverse
             throw new IllegalArgumentException("At least 1 byte should be read");
 
         V result = accessor.allocate(length);
+        // The first byte needs to have its sign flipped
         accessor.putByte(result, 0, (byte) (byteSource.next() ^ 0x80));
+        // and the rest can be retrieved unchanged.
         for (int i = 1; i < length; ++i)
         {
             int data = byteSource.next();
@@ -72,11 +82,19 @@ public final class ByteSourceInverse
         return result;
     }
 
+    /**
+     * Produce the bytes for an encoded signed fixed-length number, also translating null to empty buffer.
+     * The first byte has its sign bit inverted, and the rest are passed unchanged.
+     */
     public static <V> V getOptionalSignedFixedLength(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
         return byteSource == null ? accessor.empty() : getSignedFixedLength(accessor, byteSource, length);
     }
 
+    /**
+     * Produce the bytes for an encoded signed fixed-length floating-point number.
+     * If sign bit is on, returns negated bytes. If not, clears the sign bit and passes the rest of the bytes unchanged.
+     */
     public static <V> V getSignedFixedLengthFloat(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
         if (byteSource == null)
@@ -85,17 +103,24 @@ public final class ByteSourceInverse
             throw new IllegalArgumentException("At least 1 byte should be read");
 
         V result = accessor.allocate(length);
+
+        int xor;
         int first = byteSource.next() & 0xFF;
-        int xor = 0;
-        if (first < 0x80) // the encoding puts negative numbers below positives
+        if (first < 0x80)
         {
-            xor = 0xFF; // invert all bits
+            // Negative number. Invert all bits.
+            xor = 0xFF;
             first ^= xor;
         }
         else
+        {
+            // Positive number. Invert only the sign bit.
+            xor = 0x00;
             first ^= 0x80;
+        }
         accessor.putByte(result, 0, (byte) first);
 
+        // xor is now applied to the rest of the bytes to flip their bits if necessary.
         for (int i = 1; i < length; ++i)
         {
             int data = byteSource.next();
@@ -109,11 +134,19 @@ public final class ByteSourceInverse
         return result;
     }
 
+    /**
+     * Produce the bytes for an encoded signed fixed-length floating-point number, also translating null to an empty
+     * buffer.
+     * If sign bit is on, returns negated bytes. If not, clears the sign bit and passes the rest of the bytes unchanged.
+     */
     public static <V> V getOptionalSignedFixedLengthFloat(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
         return byteSource == null ? accessor.empty() : getSignedFixedLengthFloat(accessor, byteSource, length);
     }
 
+    /**
+     * Get the next length bytes from the source unchanged.
+     */
     public static <V> V getFixedLength(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
         if (byteSource == null)
@@ -134,6 +167,9 @@ public final class ByteSourceInverse
         return result;
     }
 
+    /**
+     * Get the next length bytes from the source unchanged, also translating null to an empty buffer.
+     */
     public static <V> V getOptionalFixedLength(ValueAccessor<V> accessor, ByteSource byteSource, int length)
     {
         return byteSource == null ? accessor.empty() : getFixedLength(accessor, byteSource, length);

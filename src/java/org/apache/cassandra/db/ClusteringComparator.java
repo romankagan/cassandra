@@ -324,6 +324,16 @@ public class ClusteringComparator implements Comparator<Clusterable>
         }
     }
 
+    /**
+     * Produces a clustering from the given byte-comparable value. The method will throw an exception if the value
+     * does not correctly encode a clustering of this type, including if it encodes a position before or after a
+     * clustering (i.e. a bound/boundary).
+     *
+     * @param accessor Accessor to use to construct components. Because this will be used to construct individual
+     *                 arrays/buffers for each component, it may be sensible to use an accessor that allocates larger
+     *                 buffers in advance.
+     * @param comparable The clustering encoded as a byte-comparable sequence.
+     */
     public <V> Clustering<V> clusteringFromByteComparable(ValueAccessor<V> accessor,
                                                           ByteComparable comparable)
     {
@@ -371,6 +381,21 @@ public class ClusteringComparator implements Comparator<Clusterable>
         }
     }
 
+    /**
+     * Produces a clustering bound from the given byte-comparable value. The method will throw an exception if the value
+     * does not correctly encode a bound position of this type, including if it encodes an exact clustering.
+     *
+     * Note that the encoded clustering position cannot specify the type of bound (i.e. start/end/boundary) because to
+     * correctly compare clustering positions the encoding must be the same for the different types (e.g. the position
+     * for a exclusive end and an inclusive start is the same, before the exact clustering). The type must be supplied
+     * separately (in the bound... vs boundary... call and isEnd argument).
+     *
+     * @param accessor Accessor to use to construct components. Because this will be used to construct individual
+     *                 arrays/buffers for each component, it may be sensible to use an accessor that allocates larger
+     *                 buffers in advance.
+     * @param comparable The clustering position encoded as a byte-comparable sequence.
+     * @param isEnd true if the bound marks the end of a range, false is it marks the start.
+     */
     public <V> ClusteringBound<V> boundFromByteComparable(ValueAccessor<V> accessor,
                                                           ByteComparable comparable,
                                                           boolean isEnd)
@@ -380,7 +405,6 @@ public class ClusteringComparator implements Comparator<Clusterable>
         if (orderedBytes == null)
             return null;
 
-        // First check for special cases (partition key only, static clustering) that can do without buffers.
         int sep = orderedBytes.next();
         int cc = 0;
         V[] components = accessor.createArray(size());
@@ -412,6 +436,20 @@ public class ClusteringComparator implements Comparator<Clusterable>
         }
     }
 
+    /**
+     * Produces a clustering boundary from the given byte-comparable value. The method will throw an exception if the
+     * value does not correctly encode a bound position of this type, including if it encodes an exact clustering.
+     *
+     * Note that the encoded clustering position cannot specify the type of bound (i.e. start/end/boundary) because to
+     * correctly compare clustering positions the encoding must be the same for the different types (e.g. the position
+     * for a exclusive end and an inclusive start is the same, before the exact clustering). The type must be supplied
+     * separately (in the bound... vs boundary... call and isEnd argument).
+     *
+     * @param accessor Accessor to use to construct components. Because this will be used to construct individual
+     *                 arrays/buffers for each component, it may be sensible to use an accessor that allocates larger
+     *                 buffers in advance.
+     * @param comparable The clustering position encoded as a byte-comparable sequence.
+     */
     public <V> ClusteringBoundary<V> boundaryFromByteComparable(ValueAccessor<V> accessor,
                                                                 ByteComparable comparable)
     {

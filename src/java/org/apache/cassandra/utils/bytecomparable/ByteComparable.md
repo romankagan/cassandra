@@ -1,3 +1,21 @@
+<!---
+ Licensed to the Apache Software Foundation (ASF) under one
+ or more contributor license agreements.  See the NOTICE file
+ distributed with this work for additional information
+ regarding copyright ownership.  The ASF licenses this file
+ to you under the Apache License, Version 2.0 (the
+ "License"); you may not use this file except in compliance
+ with the License.  You may obtain a copy of the License at
+ 
+     http://www.apache.org/licenses/LICENSE-2.0
+ 
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
 # Byte-comparable translation of types (ByteComparable/ByteSource)
 
 ## Problem / Motivation
@@ -514,9 +532,9 @@ As a description of how this produces the correct ordering, consider the result 
 byte:
 - Difference in the first byte can be caused by:
   - Difference in sign of the number or being zero, which yields the correct ordering because
-    - Negative numbers start with 0x3c - 0x44
-    - Zero starts with 0x80
-    - Positive numbers start with 0xbc - 0xc4
+    - Negative numbers start with `0x3c` - `0x44`
+    - Zero starts with `0x80`
+    - Positive numbers start with `0xbc` - `0xc4`
   - Difference in sign of the exponent modulated with the sign of the number. In a positive number negative exponents 
     mean smaller values, while in a negative number it’s the opposite, thus the modulation with the number’s sign 
     ensures the correct ordering. 
@@ -533,7 +551,7 @@ byte:
 - Difference in a mantissa byte present in both inputs:
   - Smaller byte means smaller signed mantissa and hence smaller number when the exponents are equal.
 - One mantissa ending before another:
-  - This will result in the shorter being treated as smaller (since the trailing byte is 00).
+  - This will result in the shorter being treated as smaller (since the trailing byte is `00`).
   - Since all mantissas have at least one byte, this can’t happen in the leading mantissa byte.
   - Thus the other number’s bytes from here on are not negative, and at least one of them must be non-zero, which means 
     its mantissa is bigger and thus it encodes a bigger number.
