@@ -196,7 +196,7 @@ public class TupleType extends AbstractType<ByteBuffer>
         {
             int size = accessor.getInt(v, offset);
             offset += TypeSizes.INT_SIZE;
-            if (size > 0)
+            if (size >= 0)
                 return false;
         }
         return true;
