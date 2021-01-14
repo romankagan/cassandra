@@ -253,12 +253,17 @@ public class TupleType extends AbstractType<ByteBuffer>
             int size = accessor.getInt(value, position);
             position += 4;
 
-            if (position + size > length)
-                throw new MarshalException(String.format("Not enough bytes to read %dth component", i));
-
             // size < 0 means null value
-            components[i] = size < 0 ? null : accessor.slice(value, position, size);
-            position += size;
+            if (size >= 0)
+            {
+                if (position + size > length)
+                    throw new MarshalException(String.format("Not enough bytes to read %dth component", i));
+
+                components[i] = accessor.slice(value, position, size);
+                position += size;
+            }
+            else
+                components[i] = null;
         }
 
         // error out if we got more values in the tuple/UDT than we expected
