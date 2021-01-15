@@ -211,7 +211,7 @@ public class TupleType extends AbstractType<ByteBuffer>
         V[] bufs = split(accessor, data);  // this may be shorter than types.size -- other srcs remain null in that case
         ByteSource[] srcs = new ByteSource[types.size()];
         for (int i = 0; i < bufs.length; ++i)
-            srcs[i] = types.get(i).asComparableBytes(accessor, bufs[i], version);
+            srcs[i] = bufs[i] != null ? types.get(i).asComparableBytes(accessor, bufs[i], version) : null;
         // We always have a fixed number of sources, with the trailing ones possibly being nulls.
         // This can only result in a prefix if the last type in the tuple allows prefixes. Since that type is required
         // to be weakly prefix-free, so is the tuple.
@@ -229,7 +229,10 @@ public class TupleType extends AbstractType<ByteBuffer>
         {
             AbstractType<?> componentType = types.get(i);
             ByteSource.Peekable component = ByteSourceInverse.nextComponentSource(comparableBytes);
-            componentBuffers[i] = componentType.fromComparableBytes(accessor, component, version);
+            if (comparableBytes != null)
+                componentBuffers[i] = componentType.fromComparableBytes(accessor, component, version);
+            else
+                componentBuffers[i] = null;
         }
         return buildValue(accessor, componentBuffers);
     }

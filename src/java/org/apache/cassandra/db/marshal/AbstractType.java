@@ -633,17 +633,9 @@ public abstract class AbstractType<T> implements Comparator<ByteBuffer>, Assignm
     public <V> V fromComparableBytes(ValueAccessor<V> accessor, ByteSource.Peekable comparableBytes, ByteComparable.Version version)
     {
         if (isByteOrderComparable)
-        {
-            // For BYTE_ORDER, asComparableBytes() will never create a null source, but we may get a null from TupleType
-            if (comparableBytes != null)
-                return accessor.valueOf(ByteSourceInverse.getUnescapedBytes(comparableBytes));
-            else
-                return accessor.empty();
-        }
+            return accessor.valueOf(ByteSourceInverse.getUnescapedBytes(comparableBytes));
         else
-        {
             throw new UnsupportedOperationException(getClass().getSimpleName() + " does not implement fromComparableBytes");
-        }
     }
 
     public final ByteBuffer fromComparableBytes(ByteSource.Peekable comparableBytes, ByteComparable.Version version)

@@ -373,9 +373,13 @@ public class ByteSourceComparisonTest extends ByteSourceTestBase
             (
             TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeAndRandomPad(UTF8Type.instance, ""),
                                                                                 decomposeAndRandomPad(Int32Type.instance, 0)}),
+            // Note: a decomposed null (e.g. decomposeAndRandomPad(Int32Type.instance, null)) should not reach a tuple
             TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeAndRandomPad(UTF8Type.instance, ""),
-                                                                                decomposeAndRandomPad(Int32Type.instance, null)}),
+                                                                                null}),
+            TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {null,
+                                                                                decomposeAndRandomPad(Int32Type.instance, 0)}),
             TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeAndRandomPad(UTF8Type.instance, "")}),
+            TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {null}),
             TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[0])
             );
         testBuffers(tt, tests);
@@ -384,9 +388,16 @@ public class ByteSourceComparisonTest extends ByteSourceTestBase
     void assertTupleComparesSame(AbstractType t1, AbstractType t2, Object o1, Object o2, Object o3, Object o4)
     {
         TupleType tt = new TupleType(ImmutableList.of(t1, t2));
-        ByteBuffer b1 = TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {t1.decompose(o1), t2.decompose(o2)});
-        ByteBuffer b2 = TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {t1.decompose(o3), t2.decompose(o4)});
+        ByteBuffer b1 = TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeForTuple(t1, o1),
+                                                                                            decomposeForTuple(t2, o2)});
+        ByteBuffer b2 = TupleType.buildValue(ByteBufferAccessor.instance, new ByteBuffer[] {decomposeForTuple(t1, o3),
+                                                                                            decomposeForTuple(t2, o4)});
         assertComparesSameBuffers(tt, b1, b2);
+    }
+
+    ByteBuffer decomposeForTuple(AbstractType t, Object o)
+    {
+        return o != null ? t.decompose(o) : null;
     }
 
     @Test
