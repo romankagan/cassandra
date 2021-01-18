@@ -53,7 +53,7 @@ public class DecimalType extends NumberType<BigDecimal>
     private static final byte DECIMAL_LAST_BYTE = (byte) 0x00;
     private static final BigInteger HUNDRED = BigInteger.valueOf(100);
 
-    private static final ByteBuffer ZERO_ARRAY = instance.decompose(BigDecimal.ZERO);
+    private static final ByteBuffer ZERO_BUFFER = instance.decompose(BigDecimal.ZERO);
 
     DecimalType() {super(ComparisonType.CUSTOM);} // singleton
 
@@ -180,7 +180,7 @@ public class DecimalType extends NumberType<BigDecimal>
 
         int headerBits = comparableBytes.next();
         if (headerBits == POSITIVE_DECIMAL_HEADER_MASK)
-            return accessor.valueOf(ZERO_ARRAY);
+            return accessor.valueOf(ZERO_BUFFER);
 
         // I. Extract the exponent.
         // The sign of the decimal, and the sign and the length (in bytes) of the decimal exponent, are all encoded in

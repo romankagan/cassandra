@@ -59,11 +59,11 @@ public class TimeUUIDType extends TemporalType<UUID>
 
         long msb1 = accessorL.getLong(left, 0);
         long msb2 = accessorR.getLong(right, 0);
+        verifyVersion(msb1);
+        verifyVersion(msb2);
+
         msb1 = reorderTimestampBytes(msb1);
         msb2 = reorderTimestampBytes(msb2);
-
-        assert (msb1 & topbyte(0xf0L)) == topbyte(0x10L);
-        assert (msb2 & topbyte(0xf0L)) == topbyte(0x10L);
 
         int c = Long.compare(msb1, msb2);
         if (c != 0)
@@ -82,10 +82,10 @@ public class TimeUUIDType extends TemporalType<UUID>
         if (accessor.isEmpty(data))
             return null;
 
-        long msb = accessor.getLong(data, 0);
-        assert ((msb >>> 12) & 0xf) == 1;
+        long hiBits = accessor.getLong(data, 0);
+        verifyVersion(hiBits);
         ByteBuffer swizzled = ByteBuffer.allocate(16);
-        swizzled.putLong(0, TimeUUIDType.reorderTimestampBytes(msb));
+        swizzled.putLong(0, TimeUUIDType.reorderTimestampBytes(hiBits));
         swizzled.putLong(8, accessor.getLong(data, 8) ^ 0x8080808080808080L);
 
         return ByteSource.fixedLength(swizzled);
@@ -102,10 +102,8 @@ public class TimeUUIDType extends TemporalType<UUID>
         long hiBits = ByteSourceInverse.getUnsignedFixedLengthAsLong(comparableBytes, 8);
         long loBits = ByteSourceInverse.getUnsignedFixedLengthAsLong(comparableBytes, 8);
 
-        long version1 = hiBits >>> 60 & 0xF;
-        assert (version1 == 1);
-
         hiBits = reorderBackTimestampBytes(hiBits);
+        verifyVersion(hiBits);
         // In addition, TimeUUIDType also touches the low bits of the UUID (see CASSANDRA-8730 and DB-1758).
         loBits ^= 0x8080808080808080L;
 
@@ -120,9 +118,12 @@ public class TimeUUIDType extends TemporalType<UUID>
         return signedBytes ^ 0x0080808080808080L;
     }
 
-    private static long topbyte(long topbyte)
+    private void verifyVersion(long hiBits)
     {
-        return topbyte << 56;
+        long version = (hiBits >>> 12) & 0xf;
+        if (version != 1)
+            throw new MarshalException(String.format("Invalid UUID version %d for timeuuid",
+                                                     version));
     }
 
     protected static long reorderTimestampBytes(long input)

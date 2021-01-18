@@ -353,7 +353,7 @@ public class DynamicCompositeType extends AbstractCompositeType
         {
             AbstractType<?> type = types.get(i);
             Byte alias = inverseMapping.get(type);
-            int typeNameLength = alias == null ? getTypeName(type).getBytes(StandardCharsets.UTF_8).length : 0;
+            int typeNameLength = alias == null ? type.toString().getBytes(StandardCharsets.UTF_8).length : 0;
             // The type data will be stored by means of the type's fully qualified name, not by aliasing, so:
             //   1. The type data header should be the fully qualified name length in bytes.
             //   2. The length should be small enough so that it fits in 15 bits (2 bytes with the first bit zero).
@@ -374,7 +374,7 @@ public class DynamicCompositeType extends AbstractCompositeType
             if (alias == null)
             {
                 // Write the type data (2-byte length header + the fully qualified type name in UTF-8).
-                byte[] typeNameBytes = getTypeName(type).getBytes(StandardCharsets.UTF_8);
+                byte[] typeNameBytes = type.toString().getBytes(StandardCharsets.UTF_8);
                 accessor.putShort(result,
                                   offset,
                                   (short) typeNameBytes.length); // this should work fine also if length >= 32768
@@ -401,11 +401,6 @@ public class DynamicCompositeType extends AbstractCompositeType
             offset += 1;
         }
         return result;
-    }
-
-    private static String getTypeName(AbstractType<?> type)
-    {
-        return type.toString();
     }
 
     protected ParsedComparator parseComparator(int i, String part)

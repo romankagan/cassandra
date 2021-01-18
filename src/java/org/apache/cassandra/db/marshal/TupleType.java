@@ -272,9 +272,10 @@ public class TupleType extends AbstractType<ByteBuffer>
         // error out if we got more values in the tuple/UDT than we expected
         if (position < length)
         {
-            throw new InvalidRequestException(String.format(
-            "Expected %s %s for %s column, but got more",
-            size(), size() == 1 ? "value" : "values", this.asCQL3Type()));
+            throw new MarshalException(String.format("Expected %s %s for %s column, but got more",
+                                                     size(),
+                                                     size() == 1 ? "value" : "values",
+                                                     this.asCQL3Type()));
         }
 
         return components;

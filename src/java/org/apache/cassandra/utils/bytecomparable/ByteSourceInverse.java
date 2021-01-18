@@ -30,6 +30,12 @@ import org.apache.cassandra.db.marshal.ValueAccessor;
 public final class ByteSourceInverse
 {
     private static final int INITIAL_BUFFER_CAPACITY = 32;
+    private static final int BYTE_ALL_BITS = 0xFF;
+    private static final int BYTE_NO_BITS = 0x00;
+    private static final int BYTE_SIGN_BIT = 1 << 7;
+    private static final int SHORT_SIGN_BIT = 1 << 15;
+    private static final int INT_SIGN_BIT = 1 << 31;
+    private static final long LONG_SIGN_BIT = 1L << 63;
 
     /**
      * Get the given number of bytes and produce a long from them, effectively treating the bytes as a big-endian
@@ -49,7 +55,7 @@ public final class ByteSourceInverse
             if (data == ByteSource.END_OF_STREAM)
                 throw new IllegalArgumentException(
                         String.format("Unexpected end of stream reached after %d bytes (expected >= %d)", i, length));
-            assert data >= 0 && data <= 255;
+            assertValidByte(data);
             result = (result << 8) | data;
         }
         return result;
@@ -68,7 +74,7 @@ public final class ByteSourceInverse
 
         V result = accessor.allocate(length);
         // The first byte needs to have its sign flipped
-        accessor.putByte(result, 0, (byte) (byteSource.next() ^ 0x80));
+        accessor.putByte(result, 0, (byte) (byteSource.next() ^ BYTE_SIGN_BIT));
         // and the rest can be retrieved unchanged.
         for (int i = 1; i < length; ++i)
         {
@@ -76,7 +82,7 @@ public final class ByteSourceInverse
             if (data == ByteSource.END_OF_STREAM)
                 throw new IllegalArgumentException(
                         String.format("Unexpected end of stream reached after %d bytes (expected >= %d)", i, length));
-            assert data >= 0 && data <= 255;
+            assertValidByte(data);
             accessor.putByte(result, i, (byte) data);
         }
         return result;
@@ -105,18 +111,19 @@ public final class ByteSourceInverse
         V result = accessor.allocate(length);
 
         int xor;
-        int first = byteSource.next() & 0xFF;
+        int first = byteSource.next();
+        assertValidByte(first);
         if (first < 0x80)
         {
             // Negative number. Invert all bits.
-            xor = 0xFF;
+            xor = BYTE_ALL_BITS;
             first ^= xor;
         }
         else
         {
             // Positive number. Invert only the sign bit.
-            xor = 0x00;
-            first ^= 0x80;
+            xor = BYTE_NO_BITS;
+            first ^= BYTE_SIGN_BIT;
         }
         accessor.putByte(result, 0, (byte) first);
 
@@ -127,7 +134,7 @@ public final class ByteSourceInverse
             if (data == ByteSource.END_OF_STREAM)
                 throw new IllegalArgumentException(
                 String.format("Unexpected end of stream reached after %d bytes (expected >= %d)", i, length));
-            assert data >= 0 && data <= 255;
+            assertValidByte(data);
             data ^= xor;
             accessor.putByte(result, i, (byte) data);
         }
@@ -161,7 +168,7 @@ public final class ByteSourceInverse
             if (data == ByteSource.END_OF_STREAM)
                 throw new IllegalArgumentException(
                         String.format("Unexpected end of stream reached after %d bytes (expected >= %d)", i, length));
-            assert data >= 0 && data <= 255;
+            assertValidByte(data);
             accessor.putByte(result, i, (byte) data);
         }
         return result;
@@ -193,7 +200,7 @@ public final class ByteSourceInverse
      */
     public static int getSignedInt(ByteSource byteSource)
     {
-        return (int) getUnsignedFixedLengthAsLong(byteSource, 4) ^ (1<<31);
+        return (int) getUnsignedFixedLengthAsLong(byteSource, 4) ^ INT_SIGN_BIT;
     }
 
     /**
@@ -214,7 +221,7 @@ public final class ByteSourceInverse
      */
     public static long getSignedLong(ByteSource byteSource)
     {
-        return getUnsignedFixedLengthAsLong(byteSource, 8) ^ (1L << 63);
+        return getUnsignedFixedLengthAsLong(byteSource, 8) ^ LONG_SIGN_BIT;
     }
 
     /**
@@ -230,7 +237,7 @@ public final class ByteSourceInverse
         if (theByte == ByteSource.END_OF_STREAM)
             throw new IllegalArgumentException("Unexpected ByteSource with length 0 instead of 1");
 
-        return (byte) ((theByte & 0xFF) ^ (1 << 7));
+        return (byte) (theByte ^ BYTE_SIGN_BIT);
     }
 
     /**
@@ -244,7 +251,7 @@ public final class ByteSourceInverse
      */
     public static short getSignedShort(ByteSource byteSource)
     {
-        return (short) (getUnsignedFixedLengthAsLong(byteSource, 2) ^ (1 << 15));
+        return (short) (getUnsignedFixedLengthAsLong(byteSource, 2) ^ SHORT_SIGN_BIT);
     }
 
     /**
@@ -338,7 +345,7 @@ public final class ByteSourceInverse
         while ((data = byteSource.next()) != ByteSource.END_OF_STREAM)
         {
             buf = ensureCapacity(buf, readBytes);
-            buf[readBytes++] = (byte) (data & 0xFF);
+            buf[readBytes++] = (byte) data;
         }
 
         if (readBytes != buf.length)
@@ -432,5 +439,10 @@ public final class ByteSourceInverse
     public static boolean nextComponentNull(int separator)
     {
         return separator == ByteSource.NEXT_COMPONENT_NULL || separator == ByteSource.NEXT_COMPONENT_NULL_REVERSED;
+    }
+
+    private static void assertValidByte(int data)
+    {
+        assert data >= BYTE_NO_BITS && data <= BYTE_ALL_BITS;
     }
 }
