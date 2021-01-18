@@ -229,7 +229,7 @@ public class TupleType extends AbstractType<ByteBuffer>
         {
             AbstractType<?> componentType = types.get(i);
             ByteSource.Peekable component = ByteSourceInverse.nextComponentSource(comparableBytes);
-            if (comparableBytes != null)
+            if (component != null)
                 componentBuffers[i] = componentType.fromComparableBytes(accessor, component, version);
             else
                 componentBuffers[i] = null;

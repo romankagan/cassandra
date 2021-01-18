@@ -913,8 +913,8 @@ public class AbstractTypeByteSourceTest
                     for (byte[] bytes : bytesValues)
                     {
                         ByteBuffer tupleData = TupleType.buildValue(UTF8Type.instance.decompose(utf8),
-                                                                    DecimalType.instance.decompose(decimal),
-                                                                    IntegerType.instance.decompose(varint),
+                                                                    decimal != null ? DecimalType.instance.decompose(decimal) : null,
+                                                                    varint != null ? IntegerType.instance.decompose(varint) : null,
                                                                     // We could also use the wrapped bytes directly
                                                                     BytesType.instance.decompose(ByteBuffer.wrap(bytes)));
                         tuplesData.add(tupleData);

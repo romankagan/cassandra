@@ -395,7 +395,7 @@ public class ByteSourceComparisonTest extends ByteSourceTestBase
         assertComparesSameBuffers(tt, b1, b2);
     }
 
-    ByteBuffer decomposeForTuple(AbstractType t, Object o)
+    static ByteBuffer decomposeForTuple(AbstractType t, Object o)
     {
         return o != null ? t.decompose(o) : null;
     }
