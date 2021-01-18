@@ -252,8 +252,4 @@ public class ByteSourceTestBase
                                                    DoubleType.instance,
                                                    IntegerType.instance,
                                                    DecimalType.instance };
-
-    ClusteringPrefix.Kind[] kinds = new ClusteringPrefix.Kind[]{ ClusteringPrefix.Kind.INCL_START_BOUND,
-                                                                 ClusteringPrefix.Kind.CLUSTERING,
-                                                                 ClusteringPrefix.Kind.EXCL_START_BOUND };
 }

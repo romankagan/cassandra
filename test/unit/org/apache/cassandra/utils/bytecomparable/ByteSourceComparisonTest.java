@@ -323,8 +323,8 @@ public class ByteSourceComparisonTest extends ByteSourceTestBase
     void assertClusteringPairComparesSame(AbstractType t1, AbstractType t2, Object o1, Object o2, Object o3, Object o4)
     {
         for (Version v : Version.values())
-            for (ClusteringPrefix.Kind k1 : kinds)
-                for (ClusteringPrefix.Kind k2 : kinds)
+            for (ClusteringPrefix.Kind k1 : ClusteringPrefix.Kind.values())
+                for (ClusteringPrefix.Kind k2 : ClusteringPrefix.Kind.values())
                 {
                     ClusteringComparator comp = new ClusteringComparator(t1, t2);
                     ByteBuffer[] b = new ByteBuffer[2];
@@ -333,8 +333,8 @@ public class ByteSourceComparisonTest extends ByteSourceTestBase
                     b[1] = t2.decompose(o2);
                     d[0] = t1.decompose(o3);
                     d[1] = t2.decompose(o4);
-                    ClusteringPrefix<ByteBuffer> c = ByteBufferAccessor.instance.factory().bound(k1, b);
-                    ClusteringPrefix<ByteBuffer> e = ByteBufferAccessor.instance.factory().bound(k2, d);
+                    ClusteringPrefix<ByteBuffer> c = makeBound(k1, b);
+                    ClusteringPrefix<ByteBuffer> e = makeBound(k2, d);
                     final ByteComparable bsc = comp.asByteComparable(c);
                     final ByteComparable bse = comp.asByteComparable(e);
                     int expected = Integer.signum(comp.compare(c, e));
@@ -356,6 +356,36 @@ public class ByteSourceComparisonTest extends ByteSourceTestBase
                     maybeCheck41Properties(expectedR, bsrc, bsre, v);
                     maybeAssertNotPrefix(bsrc, bsre, v);
                 }
+    }
+
+    static ClusteringPrefix<ByteBuffer> makeBound(ClusteringPrefix.Kind k1, ByteBuffer[] b)
+    {
+        return makeBound(ByteBufferAccessor.instance.factory(), k1, b);
+    }
+
+    static <V> ClusteringPrefix<V> makeBound(ValueAccessor.ObjectFactory<V> factory, ClusteringPrefix.Kind k1, V[] b)
+    {
+        switch (k1)
+        {
+        case INCL_END_EXCL_START_BOUNDARY:
+        case EXCL_END_INCL_START_BOUNDARY:
+            return factory.boundary(k1, b);
+
+        case INCL_END_BOUND:
+        case EXCL_END_BOUND:
+        case INCL_START_BOUND:
+        case EXCL_START_BOUND:
+            return factory.bound(k1, b);
+
+        case CLUSTERING:
+            return factory.clustering(b);
+
+        case STATIC_CLUSTERING:
+            return factory.staticClustering();
+
+        default:
+            throw new AssertionError();
+        }
     }
 
     @Test

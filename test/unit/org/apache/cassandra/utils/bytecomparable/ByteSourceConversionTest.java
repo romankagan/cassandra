@@ -284,17 +284,23 @@ public class ByteSourceConversionTest extends ByteSourceTestBase
 
     void assertClusteringPairConvertsSame(AbstractType t1, AbstractType t2, Object o1, Object o2)
     {
+        for (ValueAccessor<?> accessor : ValueAccessors.ACCESSORS)
+            assertClusteringPairConvertsSame(accessor, t1, t2, o1, o2);
+    }
+
+    <V> void assertClusteringPairConvertsSame(ValueAccessor<V> accessor, AbstractType t1, AbstractType t2, Object o1, Object o2)
+    {
         boolean checkEquals = t1 != DecimalType.instance && t2 != DecimalType.instance;
-        for (ClusteringPrefix.Kind k1 : kinds)
+        for (ClusteringPrefix.Kind k1 : ClusteringPrefix.Kind.values())
             {
                 ClusteringComparator comp = new ClusteringComparator(t1, t2);
-                ByteBuffer[] b = new ByteBuffer[2];
-                b[0] = t1.decompose(o1);
-                b[1] = t2.decompose(o2);
-                ClusteringPrefix<ByteBuffer> c = ByteBufferAccessor.instance.factory().bound(k1, b);
+                V[] b = accessor.createArray(2);
+                b[0] = accessor.valueOf(t1.decompose(o1));
+                b[1] = accessor.valueOf(t2.decompose(o2));
+                ClusteringPrefix<V> c = ByteSourceComparisonTest.makeBound(accessor.factory(), k1, b);
                 final ByteComparable bsc = comp.asByteComparable(c);
                 logger.info("Clustering {} bytesource {}", c.clusteringString(comp.subtypes()), bsc.byteComparableAsString(VERSION));
-                ClusteringPrefix<ByteBuffer> converted = getClusteringPrefix(k1, comp, bsc);
+                ClusteringPrefix<V> converted = getClusteringPrefix(accessor, k1, comp, bsc);
                 assertEquals(String.format("Failed compare(%s, converted %s ByteSource %s) == 0\ntype %s",
                                            safeStr(c.clusteringString(comp.subtypes())),
                                            safeStr(converted.clusteringString(comp.subtypes())),
@@ -311,7 +317,7 @@ public class ByteSourceConversionTest extends ByteSourceTestBase
 
                 ClusteringComparator compR = new ClusteringComparator(ReversedType.getInstance(t1), ReversedType.getInstance(t2));
                 final ByteComparable bsrc = compR.asByteComparable(c);
-                converted = getClusteringPrefix(k1, compR, bsrc);
+                converted = getClusteringPrefix(accessor, k1, compR, bsrc);
                 assertEquals(String.format("Failed reverse compare(%s, converted %s ByteSource %s) == 0\ntype %s",
                                            safeStr(c.clusteringString(compR.subtypes())),
                                            safeStr(converted.clusteringString(compR.subtypes())),
@@ -328,22 +334,25 @@ public class ByteSourceConversionTest extends ByteSourceTestBase
             }
     }
 
-    private ClusteringPrefix<ByteBuffer> getClusteringPrefix(ClusteringPrefix.Kind k1, ClusteringComparator comp, ByteComparable bsc)
+    private static <V> ClusteringPrefix<V> getClusteringPrefix(ValueAccessor<V> accessor,
+                                                               ClusteringPrefix.Kind k1,
+                                                               ClusteringComparator comp,
+                                                               ByteComparable bsc)
     {
         switch (k1)
         {
         case STATIC_CLUSTERING:
         case CLUSTERING:
-            return comp.clusteringFromByteComparable(ByteBufferAccessor.instance, bsc);
+            return comp.clusteringFromByteComparable(accessor, bsc);
         case EXCL_END_BOUND:
         case INCL_END_BOUND:
-            return comp.boundFromByteComparable(ByteBufferAccessor.instance, bsc, true);
+            return comp.boundFromByteComparable(accessor, bsc, true);
         case INCL_START_BOUND:
         case EXCL_START_BOUND:
-            return comp.boundFromByteComparable(ByteBufferAccessor.instance, bsc, false);
+            return comp.boundFromByteComparable(accessor, bsc, false);
         case EXCL_END_INCL_START_BOUNDARY:
         case INCL_END_EXCL_START_BOUNDARY:
-            return comp.boundaryFromByteComparable(ByteBufferAccessor.instance, bsc);
+            return comp.boundaryFromByteComparable(accessor, bsc);
         default:
             throw new AssertionError();
         }

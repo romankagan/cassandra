@@ -260,31 +260,6 @@ public interface ByteSource
     }
 
 
-    static ByteSource MAX = new ByteSource()
-    {
-        public int next()
-        {
-            return 0xFF;
-        }
-
-        public String toString()
-        {
-            return "MAX";
-        }
-    };
-
-    /**
-     * Returns a maximal ByteSource, i.e. something that compares greater to any other byte source.
-     * This is an infinite sequence of 0xFF.
-     *
-     * Note that since the sequence is infinite, trying to calculate this item's length, copying it, trying
-     * to store it in a trie, or comparing it to another max will result in an infinite loop.
-     */
-    public static ByteSource max()
-    {
-        return MAX;
-    }
-
     /**
      * Variable-length encoding. Escapes 0s as ESCAPE + zero or more ESCAPED_0_CONT + ESCAPED_0_DONE.
      * Finishes with an escape value (to which Multi will add non-zero component separator)
@@ -301,7 +276,7 @@ public interface ByteSource
      * prefix-free. Additionally, any such prefix sequence will compare smaller than the value to which it is a prefix,
      * because any permitted separator byte will be smaller than the byte following the prefix.
      */
-    static abstract class AbstractReinterpreter implements ByteSource
+    abstract static class AbstractReinterpreter implements ByteSource
     {
         final Version version;
         int bufpos;
@@ -666,84 +641,6 @@ public interface ByteSource
             public int next()
             {
                 return ++pos < offset + length ? b[pos] & 0xFF : END_OF_STREAM;
-            }
-        };
-    }
-
-    public static ByteSource fourBit(ByteSource s)
-    {
-        return new ByteSource()
-        {
-            int pos = 0;
-            int v = 0;
-
-            @Override
-            public int next()
-            {
-                if ((pos++ & 1) == 0)
-                {
-                    v = s.next();
-                    if (v == END_OF_STREAM)
-                        return END_OF_STREAM;
-                    return (v >> 4) & 0xF;
-                }
-                else
-                    return v & 0xF;
-            }
-        };
-    }
-
-    /**
-     * Splits each byte into portions of bitCount bits.
-     * @param s source
-     * @param bitCount number of bits to issue at a time, 1-4 make sense
-     */
-    public static ByteSource splitBytes(ByteSource s, int bitCount)
-    {
-        return new ByteSource()
-        {
-            int pos = 8;
-            int v = 0;
-            int mask = (1 << bitCount) - 1;
-
-            @Override
-            public int next()
-            {
-                if ((pos += bitCount) >= 8)
-                {
-                    pos = 0;
-                    v = s.next();
-                    if (v == END_OF_STREAM)
-                        return END_OF_STREAM;
-                }
-                v <<= bitCount;
-                return (v >> 8) & mask;
-            }
-        };
-    }
-
-    /**
-     * Returns the key that is immediately after src in the topology.
-     * @param src
-     * @return src with added 00 byte at the end
-     */
-    public static ByteSource nextKey(ByteSource src)
-    {
-        return new ByteSource()
-        {
-            boolean done = false;
-
-            @Override
-            public int next()
-            {
-                if (done)
-                    return END_OF_STREAM;
-                int n = src.next();
-                if (n != END_OF_STREAM)
-                    return n;
-
-                done = true;
-                return 0;
             }
         };
     }

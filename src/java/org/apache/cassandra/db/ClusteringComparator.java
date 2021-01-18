@@ -351,7 +351,8 @@ public class ClusteringComparator implements Comparator<Clusterable>
             return accessor.factory().clustering();
         case EXCLUDED:
             return accessor.factory().staticClustering();
-        // else continue with processing
+        default:
+            // continue with processing
         }
 
         int cc = 0;
