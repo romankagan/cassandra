@@ -117,46 +117,56 @@ public class DecimalType extends NumberType<BigDecimal>
             return null;
         if (value.compareTo(BigDecimal.ZERO) == 0)  // Note: 0.equals(0.0) returns false!
             return ByteSource.oneByte(POSITIVE_DECIMAL_HEADER_MASK);
+
         long scale = (((long) value.scale()) - value.precision()) & ~1;
         boolean negative = value.signum() < 0;
-        final int negmul = negative ? -1 : 1;
-        // This should always fit into an int
-        final long exponent = (-scale * negmul) / 2;
+        // Make a base-100 exponent (this will always fit in an int).
+        int exponent = Math.toIntExact(-scale / 2);
+        // Flip the exponent sign for negative numbers, so that ones with larger magnitudes are propely treated as smaller.
+        final int modulatedExponent = negative ? -exponent : exponent;
         // We should never have scale > Integer.MAX_VALUE, as we're always subtracting the non-negative precision of
         // the encoded BigDecimal, and furthermore we're rounding to negative infinity.
-        if (scale > Integer.MAX_VALUE || scale < Integer.MIN_VALUE)
+        assert scale <= Integer.MAX_VALUE;
+        // However, we may end up overflowing on the negative side.
+        if (scale < Integer.MIN_VALUE)
         {
-            // We are practically out of range here, but let's handle that anyway
-            int mv = Long.signum(scale) * Integer.MAX_VALUE;
+            // As scaleByPowerOfTen needs an int scale, do the scaling in two steps.
+            int mv = Integer.MIN_VALUE;
             value = value.scaleByPowerOfTen(mv);
             scale -= mv;
         }
         final BigDecimal mantissa = value.scaleByPowerOfTen(Ints.checkedCast(scale)).stripTrailingZeros();
+        // We now have a smaller-than-one signed mantissa, and a signed and modulated base-100 exponent.
         assert mantissa.abs().compareTo(BigDecimal.ONE) < 0;
 
         return new ByteSource()
         {
-            int posInExp = 0;
+            // Start with up to 5 bytes for sign + exponent.
+            int exponentBytesLeft = 5;
             BigDecimal current = mantissa;
 
             @Override
             public int next()
             {
-                if (posInExp < 5)
+                if (exponentBytesLeft > 0)
                 {
-                    if (posInExp == 0)
+                    --exponentBytesLeft;
+                    if (exponentBytesLeft == 4)
                     {
-                        int absexp = (int) (exponent < 0 ? -exponent : exponent);
-                        while (posInExp < 5 && absexp >> (32 - ++posInExp * 8) == 0) {}
-                        int explen = DECIMAL_EXPONENT_LENGTH_HEADER_MASK + (exponent < 0 ? -1 : 1) * (5 - posInExp);
+                        // Skip leading zero bytes in the modulatedExponent.
+                        exponentBytesLeft -= Integer.numberOfLeadingZeros(Math.abs(modulatedExponent)) / 8;
+                        // Now prepare the leading byte which includes the sign of the number plus the sign and length of the modulatedExponent.
+                        int explen = DECIMAL_EXPONENT_LENGTH_HEADER_MASK + (modulatedExponent < 0 ? -exponentBytesLeft : exponentBytesLeft);
                         return explen + (negative ? NEGATIVE_DECIMAL_HEADER_MASK : POSITIVE_DECIMAL_HEADER_MASK);
                     }
                     else
-                        return (int) ((exponent >> (32 - posInExp++ * 8))) & 0xFF;
+                        return (modulatedExponent >> (exponentBytesLeft * 8)) & 0xFF;
                 }
-                if (current == null)
+                else if (current == null)
+                {
                     return END_OF_STREAM;
-                if (current.compareTo(BigDecimal.ZERO) == 0)
+                }
+                else if (current.compareTo(BigDecimal.ZERO) == 0)
                 {
                     current = null;
                     return 0x00;

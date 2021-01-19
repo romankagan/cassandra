@@ -148,8 +148,11 @@ public final class IntegerType extends NumberType<BigInteger>
      * where a length_byte is:
      *    - 0x80 + (length - 1) for positive numbers (so that longer length sorts bigger)
      *    - 0x7F - (length - 1) for negative numbers (so that longer length sorts smaller)
-     * we don't need to sign-invert the first significant byte as the order there is already determined by the length
-     * byte.
+     *
+     * Because we include the sign in the length byte:
+     * - unlike fixed-length ints, we don't need to sign-invert the first significant byte,
+     * - unlike BigInteger, we don't need to include 0x00 prefix for positive integers whose first byte is >= 0x80
+     *   or 0xFF prefix for negative integers whose first byte is < 0x80.
      *
      * The representations are prefix-free, because representations of different length always have length bytes that
      * differ.
@@ -171,10 +174,17 @@ public final class IntegerType extends NumberType<BigInteger>
         if (p == limit)
             return null;
 
-        // skip padding
+        // skip any leading sign-only byte(s)
         final byte signbyte = accessor.getByte(data, p);
-        if (signbyte == (byte) POSITIVE_VARINT_LENGTH_HEADER || signbyte == (byte) NEGATIVE_VARINT_LENGTH_HEADER)
-            while (p + 1 < limit && accessor.getByte(data, ++p) == signbyte) {}
+        if (signbyte == BIG_INTEGER_NEGATIVE_LEADING_ZERO || signbyte == BIG_INTEGER_POSITIVE_LEADING_ZERO)
+        {
+            while (p + 1 < limit)
+            {
+                if (accessor.getByte(data, ++p) != signbyte)
+                    break;
+            }
+        }
+
         final int startpos = p;
 
         return new ByteSource()
@@ -187,17 +197,22 @@ public final class IntegerType extends NumberType<BigInteger>
             {
                 if (!sizeReported)
                 {
-                    int v = sizeToReport;
-                    if (v >= 128)
-                        v = 128;
+                    if (sizeToReport >= 128)
+                    {
+                        sizeToReport -= 128;
+                        return signbyte >= 0
+                               ? POSITIVE_VARINT_LENGTH_HEADER
+                               : NEGATIVE_VARINT_LENGTH_HEADER;
+                    }
                     else
+                    {
                         sizeReported = true;
-
-                    sizeToReport -= v;
-                    return signbyte >= 0
-                           ? POSITIVE_VARINT_HEADER + (v - 1)
-                           : POSITIVE_VARINT_HEADER - v;
+                        return signbyte >= 0
+                               ? POSITIVE_VARINT_HEADER + (sizeToReport - 1)
+                               : POSITIVE_VARINT_HEADER - sizeToReport;
+                    }
                 }
+
                 if (pos == limit)
                     return END_OF_STREAM;
 
@@ -212,41 +227,55 @@ public final class IntegerType extends NumberType<BigInteger>
         if (comparableBytes == null)
             return accessor.empty();
 
-        // Consume the first byte to determine whether the encoded number is positive.
+        int valueBytes;
+        byte signedZero;
+        // Consume the first byte to determine whether the encoded number is positive and
+        // start iterating through the length header bytes and collecting the number of value bytes.
         int curr = comparableBytes.next();
-        boolean isPositive = curr >= POSITIVE_VARINT_HEADER;
-        // Start iterating through the length header bytes and counting the number of value bytes.
-        int valueBytes = isPositive ? curr - POSITIVE_VARINT_HEADER + 1 : POSITIVE_VARINT_HEADER - curr;
-        while ((isPositive && curr == POSITIVE_VARINT_LENGTH_HEADER)
-                || (!isPositive && curr == NEGATIVE_VARINT_LENGTH_HEADER))
+        if (curr >= POSITIVE_VARINT_HEADER) // positive number
         {
-            curr = comparableBytes.next();
-            valueBytes += isPositive ? curr - POSITIVE_VARINT_HEADER + 1 : POSITIVE_VARINT_HEADER - curr;
+            valueBytes = curr - POSITIVE_VARINT_HEADER + 1;
+            while (curr == POSITIVE_VARINT_LENGTH_HEADER)
+            {
+                curr = comparableBytes.next();
+                valueBytes += curr - POSITIVE_VARINT_HEADER + 1;
+            }
+            signedZero = 0;
+        }
+        else // negative number
+        {
+            valueBytes = POSITIVE_VARINT_HEADER - curr;
+            while (curr == NEGATIVE_VARINT_LENGTH_HEADER)
+            {
+                curr = comparableBytes.next();
+                valueBytes += POSITIVE_VARINT_HEADER - curr;
+            }
+            signedZero = -1;
         }
 
+        int writtenBytes = 0;
+        V buf;
         // Add "leading zero" if needed (i.e. in case the leading byte of a positive number corresponds to a negative
         // value, or in case the leading byte of a negative number corresponds to a non-negative value).
         // Size the array containing all the value bytes accordingly.
         curr = comparableBytes.next();
-        byte[] buf;
-        int writtenBytes = 0;
-        if ((isPositive && curr >= POSITIVE_VARINT_HEADER)
-                || (!isPositive && curr < POSITIVE_VARINT_HEADER))
+        if ((curr & 0x80) != (signedZero & 0x80))
         {
-            buf = new byte[valueBytes + 1];
-            buf[writtenBytes++] = isPositive ? BIG_INTEGER_POSITIVE_LEADING_ZERO : BIG_INTEGER_NEGATIVE_LEADING_ZERO;
+            ++valueBytes;
+            buf = accessor.allocate(valueBytes);
+            accessor.putByte(buf, writtenBytes++, signedZero);
         }
         else
-            buf = new byte[valueBytes];
+            buf = accessor.allocate(valueBytes);
         // Don't forget to add the first consumed value byte after determining whether leading zero should be added
         // and sizing the value bytes array.
-        buf[writtenBytes++] = (byte) curr;
+        accessor.putByte(buf, writtenBytes++, (byte) curr);
 
         // Consume exactly the number of expected value bytes.
-        while (writtenBytes < buf.length)
-            buf[writtenBytes++] = (byte) comparableBytes.next();
+        while (writtenBytes < valueBytes)
+            accessor.putByte(buf, writtenBytes++, (byte) comparableBytes.next());
 
-        return accessor.valueOf(buf);
+        return buf;
     }
 
     public ByteBuffer fromString(String source) throws MarshalException

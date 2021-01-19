@@ -509,12 +509,12 @@ public interface ByteSource
     {
         final ByteSource[] srcs;
         int srcnum = -1;
-        int terminator;
+        int sequenceTerminator;
 
-        Multi(ByteSource[] srcs, int terminator)
+        Multi(ByteSource[] srcs, int sequenceTerminator)
         {
             this.srcs = srcs;
-            this.terminator = terminator;
+            this.sequenceTerminator = sequenceTerminator;
         }
 
         public int next()
@@ -530,7 +530,7 @@ public interface ByteSource
 
             ++srcnum;
             if (srcnum == srcs.length)
-                return terminator;
+                return sequenceTerminator;
             if (srcs[srcnum] == null)
                 return NEXT_COMPONENT_NULL;
             return NEXT_COMPONENT;

@@ -181,7 +181,8 @@ public abstract class DecoratedKey implements PartitionPosition, FilterKey
     {
         ByteSource.Peekable peekable = byteComparable.asPeekableBytes(version);
         // Decode the token from the first component of the multi-component sequence representing the whole decorated key.
-        Token token = partitioner.getTokenFactory().fromComparableBytes(ByteSourceInverse.nextComponentSource(peekable), version);
+        // We won't use it, but the decoding also positions the byte source after it.
+        partitioner.getTokenFactory().fromComparableBytes(ByteSourceInverse.nextComponentSource(peekable), version);
         // Decode the key bytes from the second component.
         return ByteSourceInverse.getUnescapedBytes(ByteSourceInverse.nextComponentSource(peekable));
     }

@@ -284,15 +284,14 @@ public class DynamicCompositeType extends AbstractCompositeType
         if (comparableBytes == null)
             return accessor.empty();
 
-        int separator = comparableBytes.next();
-        // We don't actually need isStatic, we just consume it in order to be able to continue past it.
-        boolean isStatic = ByteSourceInverse.nextComponentNull(separator);
+        // The first byte is the isStatic flag which we don't need but must consume to continue past it.
+        comparableBytes.next();
 
         List<AbstractType<?>> types = new ArrayList<>();
         List<V> values = new ArrayList<>();
         byte lastEoc = 0;
 
-        while ((separator = comparableBytes.next()) != ByteSource.TERMINATOR)
+        for (int separator = comparableBytes.next(); separator != ByteSource.TERMINATOR; separator = comparableBytes.next())
         {
             // Solely the end-of-component byte of the last component of this composite can be non-zero.
             assert lastEoc == 0 : lastEoc;
@@ -324,8 +323,7 @@ public class DynamicCompositeType extends AbstractCompositeType
             // account when we deserialize the decoded data into an object.
             lastEoc = ByteSourceInverse.getSignedByte(ByteSourceInverse.nextComponentSource(comparableBytes));
         }
-        V result = build(accessor, types, inverseMapping, values, lastEoc);
-        return result;
+        return build(accessor, types, inverseMapping, values, lastEoc);
     }
 
     public static ByteBuffer build(List<String> types, List<ByteBuffer> values)
