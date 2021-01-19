@@ -293,7 +293,7 @@
     <sequential>
       <javadoc destdir="@{destdir}" author="true" version="true" use="true"
         windowtitle="${ant.project.name} API" classpathref="cassandra.classpath"
-        bottom="Copyright &amp;copy; 2009-2020 The Apache Software Foundation"
+        bottom="Copyright &amp;copy; 2009-2021 The Apache Software Foundation"
         useexternalfile="yes" encoding="UTF-8" failonerror="false"
         maxmemory="256m" additionalparam="${jdk11-javadoc-exports}">
         <filesets/>
@@ -696,6 +696,7 @@
         <developer id="dbrosius" name="David Brosiusd"/>
         <developer id="dikang" name="Dikang Gu"/>
         <developer id="eevans" name="Eric Evans"/>
+        <developer id="edimitrova" name="Ekaterina Dimitrova"/>
         <developer id="gdusbabek" name="Gary Dusbabek"/>
         <developer id="goffinet" name="Chris Goffinet"/>
         <developer id="ifesdjeen" name="Alex Petrov"/>
