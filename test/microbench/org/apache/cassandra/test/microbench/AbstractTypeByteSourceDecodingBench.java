@@ -109,9 +109,14 @@ public class AbstractTypeByteSourceDecodingBench
     }
 
     @Benchmark
-    public ByteSource.Peekable baseline()
+    public int baseline()
     {
-        return randomPeekableBytes();
+        // Getting the source is not enough as its content is produced on next() calls.
+        ByteSource.Peekable source = randomPeekableBytes();
+        int count = 0;
+        while (source.next() != ByteSource.END_OF_STREAM)
+            ++count;
+        return count;
     }
 
     @Benchmark
