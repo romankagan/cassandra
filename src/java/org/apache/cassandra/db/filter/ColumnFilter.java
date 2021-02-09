@@ -505,8 +505,8 @@ public class ColumnFilter
                 }
             }
 
-            // See CASSANDRA-15833
-            if (version <= MessagingService.VERSION_3014 && isFetchAll)
+            // See CASSANDRA-15833, CASSANDRA-16415
+            if (isFetchAll && Gossiper.instance.isAnyNodeOn30())
                 queried = null;
 
             return new ColumnFilter(isFetchAll, fetched, queried, subSelections);
