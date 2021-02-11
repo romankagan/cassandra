@@ -18,11 +18,10 @@
 package org.apache.cassandra.io.sstable.metadata;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.UUID;
-
-import com.google.common.base.Preconditions;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.clearspring.analytics.stream.cardinality.ICardinality;
@@ -77,7 +76,7 @@ public class MetadataCollector implements PartitionStatisticsCollector
                                  NO_COMPRESSION_RATIO,
                                  defaultTombstoneDropTimeHistogram(),
                                  0,
-                                 null,
+                                 Collections.emptyList(),
                                  Slice.ALL,
                                  true,
                                  true,
@@ -283,6 +282,14 @@ public class MetadataCollector implements PartitionStatisticsCollector
         // clustering and we can save comparisons.
         if (clusteringBoundOrBoundary.isBoundary())
             return this;
+
+        if (!clusteringInitialized)
+        {
+            clusteringInitialized = true;
+            minClustering = clusteringBoundOrBoundary.minimize();
+            maxClustering = minClustering;
+            return this;
+        }
 
         if (clusteringBoundOrBoundary.kind().isStart())
         {
