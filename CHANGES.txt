@@ -1,4 +1,8 @@
 4.0-beta5
+ * Add an option to nodetool tablestats to check sstable location correctness (CASSANDRA-16344) 
+ * Unable to ALTER KEYSPACE while decommissioned/assassinated nodes are in gossip (CASSANDRA-16422)
+ * Metrics backward compatibility restored after CASSANDRA-15066 (CASSANDRA-16083)
+ * Reduce new reserved keywords introduced since 3.0 (CASSANDRA-16439)
  * Improve system tables handling in case of disk failures (CASSANDRA-14793)
  * Add access and datacenters to unreserved keywords (CASSANDRA-16398)
  * Fix nodetool ring, status output when DNS resolution or port printing are in use (CASSANDRA-16283)
@@ -20,6 +24,7 @@ Merged from 3.11:
  * Reduce amount of allocations during batch statement execution (CASSANDRA-16201)
  * Update jflex-1.6.0.jar to match upstream (CASSANDRA-16393)
 Merged from 3.0:
+ * Avoid pushing schema mutations when setting up distributed system keyspaces locally (CASSANDRA-16387)
  * Prevent unbounded number of pending flushing tasks (CASSANDRA-16261)
  * Improve empty hint file handling during startup (CASSANDRA-16162)
  * Fix skipping on pre-3.0 created compact storage sstables due to missing primary key liveness (CASSANDRA-16226)
