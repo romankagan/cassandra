@@ -249,49 +249,43 @@ public class MetadataCollector implements PartitionStatisticsCollector
         return this;
     }
 
-    public MetadataCollector updateClusteringValues(Clustering<?> clustering)
+    public void updateClusteringValues(Clustering<?> clustering)
     {
         if (clustering == Clustering.STATIC_CLUSTERING)
-            return this;
+            return;
 
         if (!clusteringInitialized)
         {
             clusteringInitialized = true;
             minClustering = clustering.minimize();
             maxClustering = minClustering;
-            return this;
         }
-
-        if (comparator.compare((ClusteringPrefix<?>) clustering, (ClusteringPrefix<?>) maxClustering) > 0)
+        else if (comparator.compare((ClusteringPrefix<?>) clustering, (ClusteringPrefix<?>) maxClustering) > 0)
         {
             maxClustering = clustering.minimize();
-            return this;
         }
-
-        if (comparator.compare((ClusteringPrefix<?>) clustering, (ClusteringPrefix<?>) minClustering) < 0)
+        else if (comparator.compare((ClusteringPrefix<?>) clustering, (ClusteringPrefix<?>) minClustering) < 0)
+        {
             minClustering = clustering.minimize();
-
-        return this;
+        }
     }
 
-    public MetadataCollector updateClusteringValuesByBoundOrBoundary(ClusteringBoundOrBoundary<?> clusteringBoundOrBoundary)
+    public void updateClusteringValuesByBoundOrBoundary(ClusteringBoundOrBoundary<?> clusteringBoundOrBoundary)
     {
         // In a SSTable, every opening marker will be closed, so the start of a range tombstone marker will never be
         // be the maxClustering (the corresponding close might though) and there is no point in doing the comparison
         // (and vice-versa for the close). By the same reasoning, a boundary will never be either the min or max
         // clustering and we can save comparisons.
         if (clusteringBoundOrBoundary.isBoundary())
-            return this;
+            return;
 
         if (!clusteringInitialized)
         {
             clusteringInitialized = true;
             minClustering = clusteringBoundOrBoundary.minimize();
             maxClustering = minClustering;
-            return this;
         }
-
-        if (clusteringBoundOrBoundary.kind().isStart())
+        else if (clusteringBoundOrBoundary.kind().isStart())
         {
             if (comparator.compare(clusteringBoundOrBoundary, minClustering) < 0)
                 minClustering = clusteringBoundOrBoundary.minimize();
@@ -301,7 +295,6 @@ public class MetadataCollector implements PartitionStatisticsCollector
             if (comparator.compare(clusteringBoundOrBoundary, maxClustering) > 0)
                 maxClustering = clusteringBoundOrBoundary.minimize();
         }
-        return this;
     }
 
     public void updateHasLegacyCounterShards(boolean hasLegacyCounterShards)
