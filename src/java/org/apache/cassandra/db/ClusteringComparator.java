@@ -140,11 +140,11 @@ public class ClusteringComparator implements Comparator<Clusterable>
     {
         int s1 = c1.size();
         int s2 = c2.size();
+        int minSize = Math.min(s1, s2);
 
-        int cmp;
-        for (int i = 0; i < s1 && i < s2; i++)
+        for (int i = 0; i < minSize; i++)
         {
-            cmp = compareComponent(i, c1.get(i), c1.accessor(), c2.get(i), c2.accessor());
+            int cmp = compareComponent(i, c1.get(i), c1.accessor(), c2.get(i), c2.accessor());
             if (cmp != 0)
                 return cmp;
         }
@@ -171,10 +171,9 @@ public class ClusteringComparator implements Comparator<Clusterable>
      */
     public <V1, V2> int compare(Clustering<V1> c1, Clustering<V2> c2, int size)
     {
-        int cmp;
         for (int i = 0; i < size; i++)
         {
-            cmp = compareComponent(i, c1.get(i), c1.accessor(), c2.get(i), c2.accessor());
+            int cmp = compareComponent(i, c1.get(i), c1.accessor(), c2.get(i), c2.accessor());
             if (cmp != 0)
                 return cmp;
         }
